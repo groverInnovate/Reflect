@@ -100,6 +100,13 @@ final class DashboardWindowController: NSWindowController {
             lines.append(contentsOf: blocks.map(renderBlock))
         }
 
+        lines.append(contentsOf: ["", "Drift Events", "------------"])
+        if analysis.driftEvents.isEmpty {
+            lines.append("No drift events detected today.")
+        } else {
+            lines.append(contentsOf: analysis.driftEvents.map(renderDrift))
+        }
+
         lines.append(contentsOf: ["", "Raw Events", "----------"])
         if events.isEmpty {
             lines.append("No raw events captured today.")
@@ -115,6 +122,13 @@ final class DashboardWindowController: NSWindowController {
         let end = dateFormatter.string(from: block.end)
         let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
         return "\(start)-\(end)  \(block.label)  \(minutes)m  [\(block.category.rawValue)]"
+    }
+
+    private func renderDrift(_ drift: DriftEvent) -> String {
+        let time = dateFormatter.string(from: drift.timestamp)
+        let triggers = drift.triggerAppNames.isEmpty ? "unknown trigger" : drift.triggerAppNames.joined(separator: ", ")
+        let severity = Int(drift.severity * 100)
+        return "\(time)  \(drift.switchCountInWindow) switches  \(severity)% severity  [\(triggers)]"
     }
 
     private func renderEvent(_ event: ActivityEvent) -> String {

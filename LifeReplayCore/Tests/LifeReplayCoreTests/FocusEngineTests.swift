@@ -22,6 +22,7 @@ struct FocusEngineTests {
         #expect(analysis.driftEvents.count == 1)
         #expect(analysis.driftEvents[0].triggerAppNames.contains("twitter.com"))
         #expect(analysis.driftEvents[0].switchCountInWindow >= 4)
+        #expect(analysis.driftEvents[0].timestamp == start.addingTimeInterval(6 * 60 + 30))
     }
 
     @Test("does not detect drift without distracting apps")

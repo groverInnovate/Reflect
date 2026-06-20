@@ -27,3 +27,7 @@ Implemented Safari/Chrome-family domain capture with AppleScript on frontmost br
 ## 2026-06-20 - Store window titles on activity events
 
 Added an optional `windowTitle` field to `ActivityEvent` and capture it through Accessibility when permission is granted. Keeping it on the raw event preserves debugging context for the dashboard; the alternative was a separate window-title event kind, which would fragment a single app activation across multiple rows.
+
+## 2026-06-20 - Notifications require a real app bundle
+
+Local drift notifications are guarded behind a `.app` bundle check because `UNUserNotificationCenter.current()` crashes when launched as a raw SwiftPM executable from `.build`. `swift run` remains useful for collector/dashboard smoke tests; notification prompts will be verified through the bundled/Xcode app path.

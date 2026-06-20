@@ -7,6 +7,7 @@ import OSLog
 final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
     private let permissions = PermissionController()
+    private let notifications = DriftNotificationController()
     private var statusItem: NSStatusItem?
     private var store: LifeReplayStore?
     private var dashboard: DashboardWindowController?
@@ -15,6 +16,10 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         guard let self else { return }
         self.store?.record(event)
         self.eventCount = self.store?.eventsForToday().count ?? self.eventCount + 1
+        let newDrifts = self.store?.refreshTodayAnalysis().newDrifts ?? []
+        for drift in newDrifts {
+            self.notifications.notify(driftEvent: drift)
+        }
         self.dashboard?.reload()
         self.updateMenu()
     }
@@ -36,6 +41,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
             logger.error("Failed to initialize local store: \(error.localizedDescription, privacy: .public)")
         }
         configureStatusItem()
+        notifications.requestAuthorizationIfNeeded()
         collector.start()
         updateMenu()
     }

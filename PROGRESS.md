@@ -21,8 +21,9 @@
 - [ ] Phase 2 - Focus Drift Engine
   - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
   - [x] Synthetic XCTest coverage added
-  - [ ] Live Mac event stream wired into persistence
-  - [ ] Drift notifications implemented
+  - [x] Live Mac event stream wired into persistence
+  - [x] Drift notifications implemented for bundled app runs
+  - [ ] Drift notifications verified from bundled app/Xcode run
 - [ ] Phase 3 - Daily Replay generation + Mac dashboard UI
   - [x] Initial timeline clustering implemented in `LifeReplayCore`
   - [ ] Dashboard timeline UI implemented
@@ -49,4 +50,7 @@
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test after the schema change.
 - Added a permissions/status section to the dashboard.
 - `swift test` passes with 5 Swift Testing tests.
-- Next best step: run a real Phase 1 session check with Mohit approving macOS prompts, then start Phase 2 live drift notifications.
+- Added live focus analysis after each captured event, persisted generated sessions/drifts, and displayed drift details in the dashboard.
+- Added local drift notifications for bundled app runs; notifications are intentionally skipped under raw `swift run` because macOS requires a real app bundle.
+- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
+- Next best step: create a proper Xcode app bundle/project so Mohit can sign in, approve prompts, and verify Phase 1/2 on-device behavior.
