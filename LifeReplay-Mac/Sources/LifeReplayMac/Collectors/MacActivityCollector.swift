@@ -87,6 +87,16 @@ final class MacActivityCollector {
         logger.info("Mac activity collector stopped")
     }
 
+    func captureCurrentBrowserDomain() -> String? {
+        guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+        frontmostBundleIdentifier = app.bundleIdentifier
+        return recordBrowserDomainIfAvailable(
+            bundleIdentifier: app.bundleIdentifier,
+            timestamp: Date(),
+            allowDuplicate: true
+        )
+    }
+
     private func recordApplication(bundleIdentifier: String?, appName: String?, processIdentifier: pid_t?, timestamp: Date) {
         frontmostBundleIdentifier = bundleIdentifier
         let windowTitle = windowTitleReader.frontWindowTitle(processIdentifier: processIdentifier)
@@ -99,7 +109,7 @@ final class MacActivityCollector {
         )
         logger.debug("Activated app: \(event.appName ?? "Unknown", privacy: .public)")
         onEvent(event)
-        recordBrowserDomainIfAvailable(bundleIdentifier: bundleIdentifier, timestamp: timestamp)
+        _ = recordBrowserDomainIfAvailable(bundleIdentifier: bundleIdentifier, timestamp: timestamp)
     }
 
     private func pollIdleState() {
@@ -114,7 +124,7 @@ final class MacActivityCollector {
             logger.info("Idle ended")
         }
 
-        recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: Date())
+        _ = recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: Date())
     }
 
     private func secondsSinceRecentInput() -> TimeInterval {
@@ -124,12 +134,16 @@ final class MacActivityCollector {
             .min() ?? 0
     }
 
-    private func recordBrowserDomainIfAvailable(bundleIdentifier: String?, timestamp: Date) {
+    private func recordBrowserDomainIfAvailable(
+        bundleIdentifier: String?,
+        timestamp: Date,
+        allowDuplicate: Bool = false
+    ) -> String? {
         guard let domain = browserDomainReader.domainForFrontmostBrowser(bundleIdentifier: bundleIdentifier) else {
-            return
+            return nil
         }
-        guard domain != lastBrowserDomain || bundleIdentifier != lastBrowserDomainBundleID else {
-            return
+        guard allowDuplicate || domain != lastBrowserDomain || bundleIdentifier != lastBrowserDomainBundleID else {
+            return domain
         }
 
         lastBrowserDomain = domain
@@ -143,5 +157,6 @@ final class MacActivityCollector {
         )
         logger.debug("Browser domain: \(domain, privacy: .public)")
         onEvent(event)
+        return domain
     }
 }

@@ -74,6 +74,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Send Test Notification", action: #selector(sendTestNotification), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Capture Current Browser Tab", action: #selector(captureCurrentBrowserTab), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show Permission Diagnostics", action: #selector(showPermissionDiagnostics), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
         menu.addItem(.separator())
@@ -191,6 +192,18 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func sendTestNotification() {
         notifications.sendTestNotification()
         updateNotificationSummary()
+    }
+
+    @objc private func captureCurrentBrowserTab() {
+        let domain = collector.captureCurrentBrowserDomain()
+        let alert = NSAlert()
+        alert.messageText = "Browser Capture"
+        if let domain {
+            alert.informativeText = "Captured domain: \(domain)"
+        } else {
+            alert.informativeText = "No browser domain captured. Bring Safari, Chrome, Brave, Edge, or Vivaldi to the front and approve Automation if macOS asks."
+        }
+        alert.runModal()
     }
 
     @objc private func openAutomationSettings() {
