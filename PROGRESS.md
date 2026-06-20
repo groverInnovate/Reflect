@@ -77,3 +77,4 @@
 - `swift test` passes with 8 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added idle periods to generated timeline blocks.
 - `swift test` passes with 9 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a menu action to send a test notification for immediate alert verification.

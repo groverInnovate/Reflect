@@ -75,20 +75,37 @@ final class DriftNotificationController {
         }
         requestAuthorizationIfNeeded()
 
+        sendNotification(
+            identifier: "drift-\(driftEvent.timestamp.timeIntervalSince1970)",
+            title: "Focus drift detected",
+            body: body(for: driftEvent)
+        )
+    }
+
+    func sendTestNotification() {
+        guard isBundledApp else {
+            logger.info("Test notification skipped while running outside an app bundle")
+            return
+        }
+        requestAuthorizationIfNeeded()
+        sendNotification(
+            identifier: "test-\(Date().timeIntervalSince1970)",
+            title: "Life Replay notifications work",
+            body: "Drift alerts will appear here when a focus break is detected."
+        )
+    }
+
+    private func sendNotification(identifier: String, title: String, body: String) {
         let content = UNMutableNotificationContent()
-        content.title = "Focus drift detected"
-        content.body = body(for: driftEvent)
+        content.title = title
+        content.body = body
         content.sound = .default
 
-        let request = UNNotificationRequest(
-            identifier: "drift-\(driftEvent.timestamp.timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
 
         UNUserNotificationCenter.current().add(request) { [logger] error in
             if let error {
-                logger.error("Failed to schedule drift notification: \(error.localizedDescription, privacy: .public)")
+                logger.error("Failed to schedule notification: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

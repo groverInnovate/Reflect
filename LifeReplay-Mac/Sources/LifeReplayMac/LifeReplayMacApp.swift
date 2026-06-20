@@ -73,6 +73,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Send Test Notification", action: #selector(sendTestNotification), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show Permission Diagnostics", action: #selector(showPermissionDiagnostics), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
         menu.addItem(.separator())
@@ -184,6 +185,11 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         notifications.requestAuthorizationIfNeeded(force: true)
+        updateNotificationSummary()
+    }
+
+    @objc private func sendTestNotification() {
+        notifications.sendTestNotification()
         updateNotificationSummary()
     }
 
