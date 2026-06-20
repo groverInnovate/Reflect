@@ -29,7 +29,7 @@
 - [ ] Phase 3 - Daily Replay generation + Mac dashboard UI
   - [x] Initial timeline clustering implemented in `LifeReplayCore`
   - [x] Daily replay snapshots persisted to SwiftData
-  - [ ] Dashboard timeline UI implemented
+  - [x] Dashboard timeline UI implemented
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
   - [x] Deterministic fallback summary implemented
@@ -63,4 +63,6 @@
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added Markdown export for generated daily replays.
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Next best step: replace the plain text dashboard with a more structured native timeline window while preserving the raw event view.
+- Replaced the single-pane dashboard with Summary, Timeline, Drift Events, and Raw Events tabs.
+- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Next best step: run the bundled app during a real session to validate capture accuracy and macOS permission prompts.

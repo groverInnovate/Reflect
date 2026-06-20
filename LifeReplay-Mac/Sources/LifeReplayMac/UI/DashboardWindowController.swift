@@ -6,7 +6,10 @@ import LifeReplayCore
 final class DashboardWindowController: NSWindowController {
     private let store: LifeReplayStore
     private let permissions: PermissionController
-    private let textView = NSTextView()
+    private let summaryTextView = NSTextView()
+    private let timelineTextView = NSTextView()
+    private let driftTextView = NSTextView()
+    private let rawTextView = NSTextView()
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .none
@@ -38,14 +41,37 @@ final class DashboardWindowController: NSWindowController {
     }
 
     func reload() {
-        textView.string = renderDashboard()
+        let data = dashboardData()
+        summaryTextView.string = renderSummary(data)
+        timelineTextView.string = renderTimeline(data.blocks)
+        driftTextView.string = renderDrifts(data.analysis.driftEvents)
+        rawTextView.string = renderRawEvents(data.events)
     }
 
     private func configureContent() {
         guard let contentView = window?.contentView else { return }
 
+        let tabView = NSTabView()
+        tabView.translatesAutoresizingMaskIntoConstraints = false
+        tabView.addTabViewItem(tab(title: "Summary", textView: summaryTextView))
+        tabView.addTabViewItem(tab(title: "Timeline", textView: timelineTextView))
+        tabView.addTabViewItem(tab(title: "Drift Events", textView: driftTextView))
+        tabView.addTabViewItem(tab(title: "Raw Events", textView: rawTextView))
+
+        contentView.addSubview(tabView)
+        NSLayoutConstraint.activate([
+            tabView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+        ])
+    }
+
+    private func tab(title: String, textView: NSTextView) -> NSTabViewItem {
+        let item = NSTabViewItem()
+        item.label = title
+
         let scrollView = NSScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .noBorder
 
@@ -56,16 +82,11 @@ final class DashboardWindowController: NSWindowController {
         textView.backgroundColor = .textBackgroundColor
         scrollView.documentView = textView
 
-        contentView.addSubview(scrollView)
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-        ])
+        item.view = scrollView
+        return item
     }
 
-    private func renderDashboard() -> String {
+    private func dashboardData() -> DashboardData {
         let events = store.eventsForToday()
         let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
         let blocks = ReplayEngine().timelineBlocks(from: analysis.sessions)
@@ -75,48 +96,48 @@ final class DashboardWindowController: NSWindowController {
             driftEvents: analysis.driftEvents,
             focusScore: analysis.focusScore
         )
+        return DashboardData(events: events, analysis: analysis, blocks: blocks, savedReplay: savedReplay, fallbackSummary: summary)
+    }
 
-        var lines: [String] = [
+    private func renderSummary(_ data: DashboardData) -> String {
+        let lines: [String] = [
             "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             "",
-            "Focus Score: \(analysis.focusScore)/100",
-            "Events captured: \(events.count)",
-            "Sessions: \(analysis.sessions.count)",
-            "Drift events: \(analysis.driftEvents.count)",
-            "Saved replay: \(savedReplay.map { "Generated \($0.generatedAt.formatted(date: .omitted, time: .shortened))" } ?? "Not generated yet")",
+            "Focus Score: \(data.analysis.focusScore)/100",
+            "Events captured: \(data.events.count)",
+            "Sessions: \(data.analysis.sessions.count)",
+            "Drift events: \(data.analysis.driftEvents.count)",
+            "Saved replay: \(data.savedReplay.map { "Generated \($0.generatedAt.formatted(date: .omitted, time: .shortened))" } ?? "Not generated yet")",
             "",
             "Permissions",
             "-----------",
             "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval for window titles")",
             "Automation: macOS will ask when Safari/Chrome tab domains are first read",
             "",
-            savedReplay?.narrativeSummary ?? summary,
-            "",
-            "Timeline",
-            "--------",
+            data.savedReplay?.narrativeSummary ?? data.fallbackSummary,
         ]
-
-        if blocks.isEmpty {
-            lines.append("No timeline blocks yet. Keep collection running and switch apps a bit.")
-        } else {
-            lines.append(contentsOf: blocks.map(renderBlock))
-        }
-
-        lines.append(contentsOf: ["", "Drift Events", "------------"])
-        if analysis.driftEvents.isEmpty {
-            lines.append("No drift events detected today.")
-        } else {
-            lines.append(contentsOf: analysis.driftEvents.map(renderDrift))
-        }
-
-        lines.append(contentsOf: ["", "Raw Events", "----------"])
-        if events.isEmpty {
-            lines.append("No raw events captured today.")
-        } else {
-            lines.append(contentsOf: events.suffix(250).map(renderEvent))
-        }
-
         return lines.joined(separator: "\n")
+    }
+
+    private func renderTimeline(_ blocks: [TimelineBlock]) -> String {
+        if blocks.isEmpty {
+            return "No timeline blocks yet. Keep collection running and switch apps a bit."
+        }
+        return blocks.map(renderBlock).joined(separator: "\n")
+    }
+
+    private func renderDrifts(_ drifts: [DriftEvent]) -> String {
+        if drifts.isEmpty {
+            return "No drift events detected today."
+        }
+        return drifts.map(renderDrift).joined(separator: "\n")
+    }
+
+    private func renderRawEvents(_ events: [ActivityEvent]) -> String {
+        if events.isEmpty {
+            return "No raw events captured today."
+        }
+        return events.suffix(250).map(renderEvent).joined(separator: "\n")
     }
 
     private func renderBlock(_ block: TimelineBlock) -> String {
@@ -139,4 +160,12 @@ final class DashboardWindowController: NSWindowController {
         let title = event.windowTitle.map { "  -  \($0)" } ?? ""
         return "\(time)  \(event.kind.rawValue)  \(name)\(title)"
     }
+}
+
+private struct DashboardData {
+    var events: [ActivityEvent]
+    var analysis: FocusAnalysis
+    var blocks: [TimelineBlock]
+    var savedReplay: DailyReplay?
+    var fallbackSummary: String
 }
