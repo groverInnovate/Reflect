@@ -1,0 +1,181 @@
+import Foundation
+import SwiftData
+
+@Model
+public final class ActivityEvent {
+    public var timestamp: Date
+    public var kindRawValue: String
+    public var appBundleID: String?
+    public var appName: String?
+    public var browserDomain: String?
+    public var source: String
+
+    public var kind: ActivityKind {
+        get { ActivityKind(rawValue: kindRawValue) ?? .appActivated }
+        set { kindRawValue = newValue.rawValue }
+    }
+
+    public init(
+        timestamp: Date,
+        kind: ActivityKind,
+        appBundleID: String? = nil,
+        appName: String? = nil,
+        browserDomain: String? = nil,
+        source: String = "mac"
+    ) {
+        self.timestamp = timestamp
+        self.kindRawValue = kind.rawValue
+        self.appBundleID = appBundleID
+        self.appName = appName
+        self.browserDomain = browserDomain
+        self.source = source
+    }
+}
+
+public enum ActivityKind: String, Codable, Sendable {
+    case appActivated
+    case idleStart
+    case idleEnd
+    case browserDomain
+}
+
+@Model
+public final class AppCategory {
+    public var matchPattern: String
+    public var displayName: String
+    public var categoryRawValue: String
+    public var isUserEdited: Bool
+
+    public var category: FocusCategory {
+        get { FocusCategory(rawValue: categoryRawValue) ?? .neutral }
+        set { categoryRawValue = newValue.rawValue }
+    }
+
+    public init(
+        matchPattern: String,
+        displayName: String,
+        category: FocusCategory,
+        isUserEdited: Bool = false
+    ) {
+        self.matchPattern = matchPattern
+        self.displayName = displayName
+        self.categoryRawValue = category.rawValue
+        self.isUserEdited = isUserEdited
+    }
+}
+
+public enum FocusCategory: String, Codable, Sendable {
+    case productive
+    case neutral
+    case distracting
+}
+
+@Model
+public final class FocusSession {
+    public var id: UUID
+    public var start: Date
+    public var end: Date?
+    public var categoryRawValue: String
+    public var primaryAppName: String?
+    public var switchCount: Int
+    public var idleSeconds: Int
+
+    public var category: FocusCategory {
+        get { FocusCategory(rawValue: categoryRawValue) ?? .neutral }
+        set { categoryRawValue = newValue.rawValue }
+    }
+
+    public init(
+        id: UUID = UUID(),
+        start: Date,
+        end: Date? = nil,
+        category: FocusCategory,
+        primaryAppName: String? = nil,
+        switchCount: Int = 0,
+        idleSeconds: Int = 0
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.categoryRawValue = category.rawValue
+        self.primaryAppName = primaryAppName
+        self.switchCount = switchCount
+        self.idleSeconds = idleSeconds
+    }
+}
+
+@Model
+public final class DriftEvent {
+    public var timestamp: Date
+    public var precedingSessionID: UUID?
+    public var triggerAppNames: [String]
+    public var switchCountInWindow: Int
+    public var baselineSwitchRate: Double
+    public var severity: Double
+
+    public init(
+        timestamp: Date,
+        precedingSessionID: UUID? = nil,
+        triggerAppNames: [String] = [],
+        switchCountInWindow: Int,
+        baselineSwitchRate: Double,
+        severity: Double
+    ) {
+        self.timestamp = timestamp
+        self.precedingSessionID = precedingSessionID
+        self.triggerAppNames = triggerAppNames
+        self.switchCountInWindow = switchCountInWindow
+        self.baselineSwitchRate = baselineSwitchRate
+        self.severity = severity
+    }
+}
+
+@Model
+public final class HealthSnapshot {
+    public var date: Date
+    public var avgHeartRate: Double?
+    public var hrv: Double?
+    public var steps: Int?
+    public var sleepHours: Double?
+    public var workoutSummary: String?
+    public var sourceFramework: String
+
+    public init(date: Date, sourceFramework: String) {
+        self.date = date
+        self.sourceFramework = sourceFramework
+    }
+}
+
+@Model
+public final class DailyReplay {
+    public var date: Date
+    public var timelineBlocksJSON: String
+    public var focusScore: Int
+    public var narrativeSummary: String?
+    public var generatedAt: Date
+    public var usedOnDeviceAI: Bool
+
+    public init(date: Date, timelineBlocksJSON: String, focusScore: Int) {
+        self.date = date
+        self.timelineBlocksJSON = timelineBlocksJSON
+        self.focusScore = focusScore
+        self.generatedAt = Date()
+        self.usedOnDeviceAI = false
+    }
+}
+
+public struct TimelineBlock: Codable, Equatable, Sendable {
+    public var start: Date
+    public var end: Date
+    public var label: String
+    public var category: FocusCategory
+    public var detail: String?
+
+    public init(start: Date, end: Date, label: String, category: FocusCategory, detail: String? = nil) {
+        self.start = start
+        self.end = end
+        self.label = label
+        self.category = category
+        self.detail = detail
+    }
+}

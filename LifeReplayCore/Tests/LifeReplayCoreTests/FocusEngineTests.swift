@@ -1,0 +1,68 @@
+import Foundation
+import Testing
+@testable import LifeReplayCore
+
+@Suite("Focus engine")
+struct FocusEngineTests {
+    @Test("detects drift after sustained productive work")
+    func detectsDriftAfterProductiveSession() {
+        let start = Date(timeIntervalSince1970: 0)
+        let events = [
+            event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            event(start.addingTimeInterval(6 * 60), app: "Terminal", bundle: "com.apple.Terminal"),
+            event(start.addingTimeInterval(6 * 60 + 30), domain: "twitter.com"),
+            event(start.addingTimeInterval(6 * 60 + 60), app: "Safari", bundle: "com.apple.Safari"),
+            event(start.addingTimeInterval(6 * 60 + 90), domain: "youtube.com"),
+            event(start.addingTimeInterval(6 * 60 + 120), app: "Messages", bundle: "com.apple.MobileSMS"),
+        ]
+
+        let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
+        let analysis = engine.analyze(events: events)
+
+        #expect(analysis.driftEvents.count == 1)
+        #expect(analysis.driftEvents[0].triggerAppNames.contains("twitter.com"))
+        #expect(analysis.driftEvents[0].switchCountInWindow >= 4)
+    }
+
+    @Test("does not detect drift without distracting apps")
+    func ignoresHighSwitchingWithoutDistraction() {
+        let start = Date(timeIntervalSince1970: 0)
+        let events = [
+            event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            event(start.addingTimeInterval(6 * 60), app: "Terminal", bundle: "com.apple.Terminal"),
+            event(start.addingTimeInterval(6 * 60 + 30), app: "Mail", bundle: "com.apple.mail"),
+            event(start.addingTimeInterval(6 * 60 + 60), app: "Calendar", bundle: "com.apple.iCal"),
+            event(start.addingTimeInterval(6 * 60 + 90), app: "Messages", bundle: "com.apple.MobileSMS"),
+        ]
+
+        let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
+        let analysis = engine.analyze(events: events)
+
+        #expect(analysis.driftEvents.isEmpty)
+    }
+
+    @Test("scores productive days higher than distracted days")
+    func scoresProductiveDayHigher() {
+        let start = Date(timeIntervalSince1970: 0)
+        let productive = [
+            FocusSession(start: start, end: start.addingTimeInterval(3600), category: .productive),
+        ]
+        let distracted = [
+            FocusSession(start: start, end: start.addingTimeInterval(1200), category: .productive),
+            FocusSession(start: start.addingTimeInterval(1200), end: start.addingTimeInterval(3600), category: .distracting),
+        ]
+        let engine = FocusEngine()
+
+        #expect(engine.score(sessions: productive, driftEvents: []) > engine.score(sessions: distracted, driftEvents: []))
+    }
+}
+
+private func event(_ timestamp: Date, app: String? = nil, bundle: String? = nil, domain: String? = nil) -> ActivityEvent {
+    ActivityEvent(
+        timestamp: timestamp,
+        kind: domain == nil ? .appActivated : .browserDomain,
+        appBundleID: bundle,
+        appName: app,
+        browserDomain: domain
+    )
+}
