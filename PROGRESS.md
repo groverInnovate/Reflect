@@ -61,4 +61,6 @@
 - `swift test` passes with 6 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added manual daily replay generation and persistence for timeline JSON, score, and fallback narrative.
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added Markdown export for generated daily replays.
+- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Next best step: replace the plain text dashboard with a more structured native timeline window while preserving the raw event view.

@@ -130,6 +130,41 @@ final class LifeReplayStore {
         }
     }
 
+    func markdownForDailyReplay(_ replay: DailyReplay) -> String {
+        let replayEngine = ReplayEngine()
+        let blocks = (try? replayEngine.decodeBlocks(from: replay.timelineBlocksJSON)) ?? []
+        var lines: [String] = [
+            "# Life Replay - \(replay.date.formatted(date: .long, time: .omitted))",
+            "",
+            "Focus Score: \(replay.focusScore)/100",
+            "Generated: \(replay.generatedAt.formatted(date: .abbreviated, time: .shortened))",
+            "On-device AI: \(replay.usedOnDeviceAI ? "yes" : "no")",
+            "",
+            "## Summary",
+            "",
+            replay.narrativeSummary ?? "No summary generated.",
+            "",
+            "## Timeline",
+            "",
+        ]
+
+        if blocks.isEmpty {
+            lines.append("No timeline blocks.")
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .none
+            formatter.timeStyle = .short
+            for block in blocks {
+                let start = formatter.string(from: block.start)
+                let end = formatter.string(from: block.end)
+                let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
+                lines.append("- \(start)-\(end): \(block.label) (\(minutes)m, \(block.category.rawValue))")
+            }
+        }
+
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     func categorySeeds() -> [AppCategorySeed] {
         categories().map {
             AppCategorySeed($0.matchPattern, $0.displayName, $0.category)

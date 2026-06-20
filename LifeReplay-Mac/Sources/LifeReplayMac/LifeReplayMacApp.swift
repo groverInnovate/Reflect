@@ -63,6 +63,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
+        menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
@@ -114,6 +115,26 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         _ = store.generateDailyReplay()
         dashboard?.reload()
         updateMenu()
+    }
+
+    @objc private func exportDailyReplay() {
+        guard let store else { return }
+        let replay = store.existingDailyReplay() ?? store.generateDailyReplay()
+        guard let replay else { return }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        panel.nameFieldStringValue = "Life Replay \(Date.now.formatted(.iso8601.year().month().day())).md"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                do {
+                    try store.markdownForDailyReplay(replay).write(to: url, atomically: true, encoding: .utf8)
+                } catch {
+                    self?.logger.error("Failed to export daily replay: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
     }
 
     @objc private func requestAccessibility() {
