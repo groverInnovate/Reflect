@@ -110,6 +110,22 @@ final class LifeReplayStore {
         )
     }
 
+    func backfillRecentDailyReplays(days: Int = 7, now: Date = Date()) -> Int {
+        let calendar = Calendar.current
+        var generated = 0
+
+        for offset in 0..<days {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: now) else { continue }
+            guard !eventsForToday(now: day).isEmpty else { continue }
+            guard existingDailyReplay(for: day) == nil else { continue }
+            if generateDailyReplay(now: day) != nil {
+                generated += 1
+            }
+        }
+
+        return generated
+    }
+
     private func replaySnapshot(now: Date) -> ReplaySnapshot {
         let events = eventsForToday(now: now)
         let analysis = makeFocusEngine().analyze(events: events, now: now)

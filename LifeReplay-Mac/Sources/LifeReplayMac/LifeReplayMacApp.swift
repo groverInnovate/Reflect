@@ -90,6 +90,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Replay History", action: #selector(openReplayHistory), keyEquivalent: "h"))
         menu.addItem(NSMenuItem(title: "Weekly Rollup", action: #selector(openWeeklyRollup), keyEquivalent: "w"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
+        menu.addItem(NSMenuItem(title: "Backfill Recent Replays", action: #selector(backfillRecentReplays), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Export Configuration...", action: #selector(exportConfiguration), keyEquivalent: ""))
@@ -209,6 +210,19 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dashboard?.reload()
             updateMenu()
         }
+    }
+
+    @objc private func backfillRecentReplays() {
+        guard let store else { return }
+        let count = store.backfillRecentDailyReplays()
+        dashboard?.reload()
+        replayHistoryWindow?.reload()
+        weeklyRollupWindow?.reload()
+
+        let alert = NSAlert()
+        alert.messageText = "Replay Backfill Complete"
+        alert.informativeText = "Generated \(count) missing replay\(count == 1 ? "" : "s") from recent local events."
+        alert.runModal()
     }
 
     @objc private func exportDailyReplay() {
