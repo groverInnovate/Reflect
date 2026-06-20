@@ -35,3 +35,7 @@ Local drift notifications are guarded behind a `.app` bundle check because `UNUs
 ## 2026-06-20 - Add script-built Mac app bundle before Xcode project
 
 Added `scripts/build-mac-app.sh` to wrap the SwiftPM executable in a local `.app` bundle with the needed Info.plist keys. This lets Mohit test menu bar behavior and notification/Automation prompts before we invest in hand-maintaining an Xcode project; the alternative was to make Xcode setup the immediate blocker.
+
+## 2026-06-20 - Plain text category editor first
+
+Added an AppKit category editor using one editable rule per line (`pattern | name | category`). It is less polished than a table editor, but it makes classifications correctable immediately and keeps the MVP moving; the alternative was a custom NSTableView editor with more UI code before real usage feedback.

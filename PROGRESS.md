@@ -18,6 +18,7 @@
   - [x] Menu bar controls show running state and event count
   - [x] Collector events persisted to SwiftData
   - [x] Basic raw event inspection window implemented
+  - [x] User-editable app/domain categories implemented
   - [ ] Real coding-session verification completed by Mohit
 - [ ] Phase 2 - Focus Drift Engine
   - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
@@ -55,4 +56,6 @@
 - Added local drift notifications for bundled app runs; notifications are intentionally skipped under raw `swift run` because macOS requires a real app bundle.
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
 - Added `scripts/build-mac-app.sh`; `.build/LifeReplayMac.app` launches successfully through `open`.
-- Next best step: have Mohit run the bundled app, approve macOS prompts, and verify Phase 1/2 behavior during a real work session. Xcode signing is still only needed when we start the Xcode project/iPhone HealthKit probe path.
+- Added editable category rules and switched live/dashboard analysis to use SwiftData categories.
+- `swift test` passes with 6 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Next best step: improve replay persistence/export so daily summaries can be regenerated and retained, then continue toward the fuller dashboard.

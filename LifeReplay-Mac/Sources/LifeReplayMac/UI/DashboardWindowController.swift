@@ -67,7 +67,7 @@ final class DashboardWindowController: NSWindowController {
 
     private func renderDashboard() -> String {
         let events = store.eventsForToday()
-        let analysis = FocusEngine().analyze(events: events, now: Date())
+        let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
         let blocks = ReplayEngine().timelineBlocks(from: analysis.sessions)
         let summary = ReplayEngine().fallbackSummary(
             blocks: blocks,

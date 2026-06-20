@@ -11,6 +11,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var store: LifeReplayStore?
     private var dashboard: DashboardWindowController?
+    private var categoryEditor: CategoryEditorWindowController?
     private var eventCount = 0
     private lazy var collector = MacActivityCollector { [weak self] event in
         guard let self else { return }
@@ -61,6 +62,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleCollection), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
@@ -93,6 +95,16 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         }
         dashboard?.reload()
         dashboard?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    @objc private func openCategoryEditor() {
+        guard let store else { return }
+        if categoryEditor == nil {
+            categoryEditor = CategoryEditorWindowController(store: store)
+        }
+        categoryEditor?.reload()
+        categoryEditor?.showWindow(nil)
         NSApp.activate()
     }
 

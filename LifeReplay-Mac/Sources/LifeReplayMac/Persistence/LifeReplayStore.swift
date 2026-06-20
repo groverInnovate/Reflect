@@ -36,7 +36,7 @@ final class LifeReplayStore {
     func refreshTodayAnalysis(now: Date = Date()) -> (analysis: FocusAnalysis, newDrifts: [DriftEvent]) {
         let existingDriftKeys = Set(driftEventsForToday(now: now).map(driftKey))
         let events = eventsForToday(now: now)
-        let analysis = FocusEngine().analyze(events: events, now: now)
+        let analysis = makeFocusEngine().analyze(events: events, now: now)
         let newDrifts = analysis.driftEvents.filter { !existingDriftKeys.contains(driftKey($0)) }
 
         replaceTodaySessionsAndDrifts(with: analysis, now: now)
@@ -73,6 +73,37 @@ final class LifeReplayStore {
         } catch {
             logger.error("Failed to fetch app categories: \(error.localizedDescription, privacy: .public)")
             return []
+        }
+    }
+
+    func categorySeeds() -> [AppCategorySeed] {
+        categories().map {
+            AppCategorySeed($0.matchPattern, $0.displayName, $0.category)
+        }
+    }
+
+    func makeFocusEngine() -> FocusEngine {
+        FocusEngine(resolver: CategoryResolver(seeds: categorySeeds()))
+    }
+
+    func replaceCategories(with seeds: [AppCategorySeed]) {
+        for category in categories() {
+            context.delete(category)
+        }
+        for seed in seeds {
+            context.insert(AppCategory(
+                matchPattern: seed.matchPattern,
+                displayName: seed.displayName,
+                category: seed.category,
+                isUserEdited: true
+            ))
+        }
+
+        do {
+            try context.save()
+            _ = refreshTodayAnalysis()
+        } catch {
+            logger.error("Failed to replace app categories: \(error.localizedDescription, privacy: .public)")
         }
     }
 
