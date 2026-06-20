@@ -69,6 +69,7 @@ final class DashboardWindowController: NSWindowController {
         let events = store.eventsForToday()
         let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
         let blocks = ReplayEngine().timelineBlocks(from: analysis.sessions)
+        let savedReplay = store.existingDailyReplay()
         let summary = ReplayEngine().fallbackSummary(
             blocks: blocks,
             driftEvents: analysis.driftEvents,
@@ -82,13 +83,14 @@ final class DashboardWindowController: NSWindowController {
             "Events captured: \(events.count)",
             "Sessions: \(analysis.sessions.count)",
             "Drift events: \(analysis.driftEvents.count)",
+            "Saved replay: \(savedReplay.map { "Generated \($0.generatedAt.formatted(date: .omitted, time: .shortened))" } ?? "Not generated yet")",
             "",
             "Permissions",
             "-----------",
             "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval for window titles")",
             "Automation: macOS will ask when Safari/Chrome tab domains are first read",
             "",
-            summary,
+            savedReplay?.narrativeSummary ?? summary,
             "",
             "Timeline",
             "--------",

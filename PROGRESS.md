@@ -28,6 +28,7 @@
   - [ ] Drift notifications verified from bundled app/Xcode run
 - [ ] Phase 3 - Daily Replay generation + Mac dashboard UI
   - [x] Initial timeline clustering implemented in `LifeReplayCore`
+  - [x] Daily replay snapshots persisted to SwiftData
   - [ ] Dashboard timeline UI implemented
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
@@ -58,4 +59,6 @@
 - Added `scripts/build-mac-app.sh`; `.build/LifeReplayMac.app` launches successfully through `open`.
 - Added editable category rules and switched live/dashboard analysis to use SwiftData categories.
 - `swift test` passes with 6 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Next best step: improve replay persistence/export so daily summaries can be regenerated and retained, then continue toward the fuller dashboard.
+- Added manual daily replay generation and persistence for timeline JSON, score, and fallback narrative.
+- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Next best step: replace the plain text dashboard with a more structured native timeline window while preserving the raw event view.

@@ -62,6 +62,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleCollection), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
@@ -106,6 +107,13 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         categoryEditor?.reload()
         categoryEditor?.showWindow(nil)
         NSApp.activate()
+    }
+
+    @objc private func generateDailyReplay() {
+        guard let store else { return }
+        _ = store.generateDailyReplay()
+        dashboard?.reload()
+        updateMenu()
     }
 
     @objc private func requestAccessibility() {

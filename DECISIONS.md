@@ -39,3 +39,7 @@ Added `scripts/build-mac-app.sh` to wrap the SwiftPM executable in a local `.app
 ## 2026-06-20 - Plain text category editor first
 
 Added an AppKit category editor using one editable rule per line (`pattern | name | category`). It is less polished than a table editor, but it makes classifications correctable immediately and keeps the MVP moving; the alternative was a custom NSTableView editor with more UI code before real usage feedback.
+
+## 2026-06-20 - Persist replay snapshots explicitly
+
+Added manual daily replay generation that saves timeline JSON, focus score, and fallback narrative into `DailyReplay`. The dashboard can still render live data, but saved snapshots give Mohit a stable end-of-day artifact; the alternative was to keep replay purely derived until the UI was more polished.

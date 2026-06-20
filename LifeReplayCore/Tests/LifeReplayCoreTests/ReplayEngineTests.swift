@@ -34,4 +34,24 @@ struct ReplayEngineTests {
         #expect(summary.contains("50m"))
         #expect(summary.contains("82"))
     }
+
+    @Test("timeline blocks round-trip through JSON")
+    func timelineBlocksRoundTrip() throws {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let blocks = [
+            TimelineBlock(
+                start: start,
+                end: start.addingTimeInterval(600),
+                label: "VS Code",
+                category: .productive,
+                detail: "Terminal"
+            ),
+        ]
+        let engine = ReplayEngine()
+
+        let json = try engine.encode(blocks: blocks)
+        let decoded = try engine.decodeBlocks(from: json)
+
+        #expect(decoded == blocks)
+    }
 }

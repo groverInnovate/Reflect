@@ -63,6 +63,19 @@ public struct ReplayEngine: Sendable {
         return "Best block: \(longest.label) for \(minutes)m, with \(driftText) and a focus score of \(focusScore)."
     }
 
+    public func encode(blocks: [TimelineBlock]) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(blocks)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    public func decodeBlocks(from json: String) throws -> [TimelineBlock] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode([TimelineBlock].self, from: Data(json.utf8))
+    }
+
     private func label(for category: FocusCategory) -> String {
         switch category {
         case .productive:

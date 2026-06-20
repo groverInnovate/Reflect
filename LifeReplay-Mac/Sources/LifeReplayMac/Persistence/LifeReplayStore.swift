@@ -43,6 +43,40 @@ final class LifeReplayStore {
         return (analysis, newDrifts)
     }
 
+    func generateDailyReplay(now: Date = Date()) -> DailyReplay? {
+        let events = eventsForToday(now: now)
+        let analysis = makeFocusEngine().analyze(events: events, now: now)
+        let replayEngine = ReplayEngine()
+        let blocks = replayEngine.timelineBlocks(from: analysis.sessions)
+
+        do {
+            let json = try replayEngine.encode(blocks: blocks)
+            let replay = existingDailyReplay(for: now) ?? DailyReplay(
+                date: Calendar.current.startOfDay(for: now),
+                timelineBlocksJSON: json,
+                focusScore: analysis.focusScore
+            )
+            replay.timelineBlocksJSON = json
+            replay.focusScore = analysis.focusScore
+            replay.narrativeSummary = replayEngine.fallbackSummary(
+                blocks: blocks,
+                driftEvents: analysis.driftEvents,
+                focusScore: analysis.focusScore
+            )
+            replay.generatedAt = Date()
+            replay.usedOnDeviceAI = false
+
+            if existingDailyReplay(for: now) == nil {
+                context.insert(replay)
+            }
+            try context.save()
+            return replay
+        } catch {
+            logger.error("Failed to generate daily replay: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
     func eventsForToday(now: Date = Date()) -> [ActivityEvent] {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
@@ -73,6 +107,26 @@ final class LifeReplayStore {
         } catch {
             logger.error("Failed to fetch app categories: \(error.localizedDescription, privacy: .public)")
             return []
+        }
+    }
+
+    func existingDailyReplay(for date: Date = Date()) -> DailyReplay? {
+        let day = Calendar.current.startOfDay(for: date)
+        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
+        let predicate = #Predicate<DailyReplay> { replay in
+            replay.date >= day && replay.date < nextDay
+        }
+        var descriptor = FetchDescriptor<DailyReplay>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
