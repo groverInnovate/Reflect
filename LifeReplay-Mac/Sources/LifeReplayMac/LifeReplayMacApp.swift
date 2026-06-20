@@ -5,6 +5,10 @@ import OSLog
 @MainActor
 @main
 final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
+    private enum DefaultsKey {
+        static let collectionEnabled = "collectionEnabled"
+    }
+
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
     private let permissions = PermissionController()
     private let notifications = DriftNotificationController()
@@ -17,6 +21,17 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dataStatusWindow: DataStatusWindowController?
     private var replayHistoryWindow: ReplayHistoryWindowController?
     private var eventCount = 0
+    private var collectionEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: DefaultsKey.collectionEnabled) == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: DefaultsKey.collectionEnabled)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: DefaultsKey.collectionEnabled)
+        }
+    }
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private lazy var collector = MacActivityCollector { [weak self] event in
         guard let self else { return }
@@ -48,7 +63,9 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         configureStatusItem()
         notifications.requestAuthorizationIfNeeded()
-        collector.start()
+        if collectionEnabled {
+            collector.start()
+        }
         updateMenu()
     }
 
@@ -60,7 +77,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func updateMenu() {
-        statusItem?.button?.title = "Life Replay \(eventCount)"
+        statusItem?.button?.title = collector.isRunning ? "Life Replay \(eventCount)" : "Life Replay Paused"
 
         let menu = NSMenu()
         menu.delegate = self
@@ -106,8 +123,10 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleCollection() {
         if collector.isRunning {
             collector.stop()
+            collectionEnabled = false
         } else {
             collector.start()
+            collectionEnabled = true
         }
         updateMenu()
     }

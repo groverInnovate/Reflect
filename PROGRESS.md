@@ -86,3 +86,4 @@
 - Added a read-only Data Status window with today/all-time persistence counts.
 - Added a read-only Replay History window for saved daily replays.
 - Added optional Launch at Login menu toggle.
+- Pause/resume collection now persists across app relaunches.
