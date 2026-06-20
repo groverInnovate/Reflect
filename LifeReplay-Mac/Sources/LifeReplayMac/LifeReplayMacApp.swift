@@ -14,6 +14,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var categoryEditor: CategoryEditorWindowController?
     private var focusSettingsWindow: FocusSettingsWindowController?
     private var dataStatusWindow: DataStatusWindowController?
+    private var replayHistoryWindow: ReplayHistoryWindowController?
     private var eventCount = 0
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private lazy var collector = MacActivityCollector { [weak self] event in
@@ -67,6 +68,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleCollection), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem(title: "Replay History", action: #selector(openReplayHistory), keyEquivalent: "h"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
@@ -153,6 +155,16 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         dataStatusWindow?.reload()
         dataStatusWindow?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    @objc private func openReplayHistory() {
+        guard let store else { return }
+        if replayHistoryWindow == nil {
+            replayHistoryWindow = ReplayHistoryWindowController(store: store)
+        }
+        replayHistoryWindow?.reload()
+        replayHistoryWindow?.showWindow(nil)
         NSApp.activate()
     }
 

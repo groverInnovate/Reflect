@@ -194,6 +194,20 @@ final class LifeReplayStore {
         }
     }
 
+    func dailyReplays(limit: Int = 60) -> [DailyReplay] {
+        var descriptor = FetchDescriptor<DailyReplay>(
+            sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            logger.error("Failed to fetch daily replay history: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
     private func latestDailyReplay() -> DailyReplay? {
         var descriptor = FetchDescriptor<DailyReplay>(
             sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
