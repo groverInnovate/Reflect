@@ -7,6 +7,7 @@ public final class ActivityEvent {
     public var kindRawValue: String
     public var appBundleID: String?
     public var appName: String?
+    public var windowTitle: String?
     public var browserDomain: String?
     public var source: String
 
@@ -20,6 +21,7 @@ public final class ActivityEvent {
         kind: ActivityKind,
         appBundleID: String? = nil,
         appName: String? = nil,
+        windowTitle: String? = nil,
         browserDomain: String? = nil,
         source: String = "mac"
     ) {
@@ -27,6 +29,7 @@ public final class ActivityEvent {
         self.kindRawValue = kind.rawValue
         self.appBundleID = appBundleID
         self.appName = appName
+        self.windowTitle = windowTitle
         self.browserDomain = browserDomain
         self.source = source
     }

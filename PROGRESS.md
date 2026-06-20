@@ -13,10 +13,11 @@
   - [x] Idle start/end events captured in the menu bar process
   - [x] Accessibility permission prompt/settings link implemented
   - [x] Browser-domain capture implemented for Safari and Chrome-family browsers
-  - [ ] Accessibility window-title capture implemented
+  - [x] Accessibility window-title capture implemented
   - [x] Menu bar controls show running state and event count
   - [x] Collector events persisted to SwiftData
   - [x] Basic raw event inspection window implemented
+  - [ ] Real coding-session verification completed by Mohit
 - [ ] Phase 2 - Focus Drift Engine
   - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
   - [x] Synthetic XCTest coverage added
@@ -44,4 +45,6 @@
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
 - Added Accessibility permission menu actions and AppleScript browser-domain capture.
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
-- Next best step: add Accessibility-based front window title capture and a clearer permissions section in the dashboard.
+- Added optional window title capture through Accessibility and showed titles in the raw event dashboard.
+- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test after the schema change.
+- Next best step: improve the dashboard permissions/status section and then run a real Phase 1 session check with Mohit approving macOS prompts.

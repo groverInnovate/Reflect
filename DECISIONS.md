@@ -23,3 +23,7 @@ Added a simple AppKit dashboard backed by SwiftData that shows today's score, ti
 ## 2026-06-20 - AppleScript browser domains before richer browser extensions
 
 Implemented Safari/Chrome-family domain capture with AppleScript on frontmost browser activation. This matches the $0 local-first constraint and uses the standard Automation prompt; the alternative was a browser extension, which would add a separate install/debug surface before the Mac collector is stable.
+
+## 2026-06-20 - Store window titles on activity events
+
+Added an optional `windowTitle` field to `ActivityEvent` and capture it through Accessibility when permission is granted. Keeping it on the raw event preserves debugging context for the dashboard; the alternative was a separate window-title event kind, which would fragment a single app activation across multiple rows.

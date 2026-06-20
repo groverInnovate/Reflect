@@ -10,6 +10,7 @@ final class MacActivityCollector {
     private let idleThreshold: TimeInterval
     private let onEvent: (ActivityEvent) -> Void
     private let browserDomainReader = BrowserDomainReader()
+    private let windowTitleReader = WindowTitleReader()
     private var observer: NSObjectProtocol?
     private var timer: Timer?
     private var isIdle = false
@@ -37,9 +38,15 @@ final class MacActivityCollector {
             }
             let bundleIdentifier = app.bundleIdentifier
             let appName = app.localizedName
+            let processIdentifier = app.processIdentifier
             let timestamp = Date()
             Task { @MainActor in
-                self?.recordApplication(bundleIdentifier: bundleIdentifier, appName: appName, timestamp: timestamp)
+                self?.recordApplication(
+                    bundleIdentifier: bundleIdentifier,
+                    appName: appName,
+                    processIdentifier: processIdentifier,
+                    timestamp: timestamp
+                )
             }
         }
 
@@ -50,7 +57,12 @@ final class MacActivityCollector {
         }
 
         if let app = NSWorkspace.shared.frontmostApplication {
-            recordApplication(bundleIdentifier: app.bundleIdentifier, appName: app.localizedName, timestamp: Date())
+            recordApplication(
+                bundleIdentifier: app.bundleIdentifier,
+                appName: app.localizedName,
+                processIdentifier: app.processIdentifier,
+                timestamp: Date()
+            )
         }
 
         logger.info("Mac activity collector started")
@@ -73,12 +85,14 @@ final class MacActivityCollector {
         logger.info("Mac activity collector stopped")
     }
 
-    private func recordApplication(bundleIdentifier: String?, appName: String?, timestamp: Date) {
+    private func recordApplication(bundleIdentifier: String?, appName: String?, processIdentifier: pid_t?, timestamp: Date) {
+        let windowTitle = windowTitleReader.frontWindowTitle(processIdentifier: processIdentifier)
         let event = ActivityEvent(
             timestamp: timestamp,
             kind: .appActivated,
             appBundleID: bundleIdentifier,
-            appName: appName
+            appName: appName,
+            windowTitle: windowTitle
         )
         logger.debug("Activated app: \(event.appName ?? "Unknown", privacy: .public)")
         onEvent(event)

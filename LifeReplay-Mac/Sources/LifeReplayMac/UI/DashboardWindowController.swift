@@ -113,6 +113,7 @@ final class DashboardWindowController: NSWindowController {
     private func renderEvent(_ event: ActivityEvent) -> String {
         let time = dateFormatter.string(from: event.timestamp)
         let name = event.browserDomain ?? event.appName ?? event.appBundleID ?? "-"
-        return "\(time)  \(event.kind.rawValue)  \(name)"
+        let title = event.windowTitle.map { "  -  \($0)" } ?? ""
+        return "\(time)  \(event.kind.rawValue)  \(name)\(title)"
     }
 }
