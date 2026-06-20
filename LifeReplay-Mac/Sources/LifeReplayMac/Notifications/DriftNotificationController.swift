@@ -3,8 +3,12 @@ import LifeReplayCore
 import OSLog
 import UserNotifications
 
+private let driftCategoryIdentifier = "FOCUS_DRIFT"
+private let snoozeActionIdentifier = "SNOOZE_15"
+private let dismissActionIdentifier = "DISMISS"
+
 @MainActor
-final class DriftNotificationController {
+final class DriftNotificationController: NSObject, UNUserNotificationCenterDelegate {
     enum AuthorizationSummary: String {
         case unavailable = "Unavailable outside app bundle"
         case notDetermined = "Not requested"
@@ -18,6 +22,14 @@ final class DriftNotificationController {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Notifications")
     private var isBundledApp: Bool {
         Bundle.main.bundleURL.pathExtension == "app"
+    }
+
+    override init() {
+        super.init()
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        center.setNotificationCategories([Self.driftCategory()])
     }
 
     func authorizationSummary(completion: @escaping @MainActor (AuthorizationSummary) -> Void) {
@@ -78,7 +90,8 @@ final class DriftNotificationController {
         sendNotification(
             identifier: "drift-\(driftEvent.timestamp.timeIntervalSince1970)",
             title: "Focus drift detected",
-            body: body(for: driftEvent)
+            body: body(for: driftEvent),
+            categoryIdentifier: driftCategoryIdentifier
         )
     }
 
@@ -91,15 +104,19 @@ final class DriftNotificationController {
         sendNotification(
             identifier: "test-\(Date().timeIntervalSince1970)",
             title: "Life Replay notifications work",
-            body: "Drift alerts will appear here when a focus break is detected."
+            body: "Drift alerts will appear here when a focus break is detected.",
+            categoryIdentifier: driftCategoryIdentifier
         )
     }
 
-    private func sendNotification(identifier: String, title: String, body: String) {
+    private func sendNotification(identifier: String, title: String, body: String, categoryIdentifier: String? = nil) {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
+        if let categoryIdentifier {
+            content.categoryIdentifier = categoryIdentifier
+        }
 
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
 
@@ -110,10 +127,52 @@ final class DriftNotificationController {
         }
     }
 
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        if response.actionIdentifier == snoozeActionIdentifier {
+            let content = UNMutableNotificationContent()
+            content.title = "Focus drift reminder"
+            content.body = "Check whether you are back in the intended work block."
+            content.sound = .default
+            content.categoryIdentifier = driftCategoryIdentifier
+
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 15 * 60, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: "drift-snooze-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: trigger
+            )
+            center.add(request)
+        }
+        completionHandler()
+    }
+
     private func body(for driftEvent: DriftEvent) -> String {
         let triggers = driftEvent.triggerAppNames.isEmpty
             ? "a distracting app"
             : driftEvent.triggerAppNames.joined(separator: ", ")
         return "\(driftEvent.switchCountInWindow) switches near \(triggers)."
+    }
+
+    private static func driftCategory() -> UNNotificationCategory {
+        let snooze = UNNotificationAction(
+            identifier: snoozeActionIdentifier,
+            title: "Snooze 15m",
+            options: []
+        )
+        let dismiss = UNNotificationAction(
+            identifier: dismissActionIdentifier,
+            title: "Dismiss",
+            options: []
+        )
+        return UNNotificationCategory(
+            identifier: driftCategoryIdentifier,
+            actions: [snooze, dismiss],
+            intentIdentifiers: [],
+            options: []
+        )
     }
 }
