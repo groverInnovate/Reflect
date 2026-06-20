@@ -7,10 +7,15 @@ import OSLog
 final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
     private var statusItem: NSStatusItem?
+    private var store: LifeReplayStore?
+    private var dashboard: DashboardWindowController?
     private var eventCount = 0
-    private lazy var collector = MacActivityCollector { [weak self] _ in
-        self?.eventCount += 1
-        self?.updateMenu()
+    private lazy var collector = MacActivityCollector { [weak self] event in
+        guard let self else { return }
+        self.store?.record(event)
+        self.eventCount = self.store?.eventsForToday().count ?? self.eventCount + 1
+        self.dashboard?.reload()
+        self.updateMenu()
     }
 
     static func main() {
@@ -23,6 +28,12 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         logger.info("LifeReplayMac launched")
+        do {
+            store = try LifeReplayStore()
+            eventCount = store?.eventsForToday().count ?? 0
+        } catch {
+            logger.error("Failed to initialize local store: \(error.localizedDescription, privacy: .public)")
+        }
         configureStatusItem()
         collector.start()
         updateMenu()
@@ -58,6 +69,20 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
 
     @objc private func openDashboard() {
         logger.info("Dashboard requested")
+        guard let store else {
+            let alert = NSAlert()
+            alert.messageText = "Local store unavailable"
+            alert.informativeText = "Life Replay could not open its SwiftData store. Check Console logs for the underlying error."
+            alert.runModal()
+            return
+        }
+
+        if dashboard == nil {
+            dashboard = DashboardWindowController(store: store)
+        }
+        dashboard?.reload()
+        dashboard?.showWindow(nil)
+        NSApp.activate()
     }
 
     @objc private func quit() {

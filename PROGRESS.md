@@ -13,7 +13,8 @@
   - [x] Idle start/end events captured in the menu bar process
   - [ ] Accessibility and browser-domain permission flows implemented
   - [x] Menu bar controls show running state and event count
-  - [ ] Collector events persisted to SwiftData
+  - [x] Collector events persisted to SwiftData
+  - [x] Basic raw event inspection window implemented
 - [ ] Phase 2 - Focus Drift Engine
   - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
   - [x] Synthetic XCTest coverage added
@@ -37,4 +38,6 @@
 - Added the first testable core implementation for categories, drift detection, scoring, timeline clustering, and fallback summaries.
 - Added an initial macOS menu bar collector for frontmost app switches and idle transitions.
 - `swift test` passes with 5 Swift Testing tests.
-- Next best step: add SwiftData storage for collected events, then implement raw event inspection/dashboard UI.
+- Added SwiftData persistence and a basic native dashboard/raw event window.
+- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
+- Next best step: add Accessibility permission flow and browser domain capture for Safari/Chrome.

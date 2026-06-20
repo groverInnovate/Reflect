@@ -15,3 +15,7 @@ Documented the HealthKit probe as pending because it requires Xcode signing with
 ## 2026-06-20 - Collector starts in-memory before SwiftData wiring
 
 Implemented the first macOS collector as an in-memory menu bar flow that records app switches and idle transitions into callbacks. This proves the AppKit/CoreGraphics path compiles before adding storage; the alternative was to introduce SwiftData persistence and collector permissions in the same change.
+
+## 2026-06-20 - Native text dashboard before designed SwiftUI dashboard
+
+Added a simple AppKit dashboard backed by SwiftData that shows today's score, timeline, and raw events. This gives a verifiable Phase 1 inspection surface immediately; the alternative was to wait for the fuller Phase 3 SwiftUI dashboard before making captured data visible.
