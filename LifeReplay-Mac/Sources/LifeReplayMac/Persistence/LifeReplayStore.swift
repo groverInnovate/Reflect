@@ -9,6 +9,17 @@ private struct ReplaySnapshot {
     var fallbackSummary: String
 }
 
+struct DataStatus {
+    var todayEvents: Int
+    var todaySessions: Int
+    var todayDrifts: Int
+    var allEvents: Int
+    var allSessions: Int
+    var allDrifts: Int
+    var allReplays: Int
+    var latestReplayGeneratedAt: Date?
+}
+
 @MainActor
 final class LifeReplayStore {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Store")
@@ -150,6 +161,19 @@ final class LifeReplayStore {
         }
     }
 
+    func dataStatus(now: Date = Date()) -> DataStatus {
+        DataStatus(
+            todayEvents: eventsForToday(now: now).count,
+            todaySessions: focusSessionsForToday(now: now).count,
+            todayDrifts: driftEventsForToday(now: now).count,
+            allEvents: count(ActivityEvent.self),
+            allSessions: count(FocusSession.self),
+            allDrifts: count(DriftEvent.self),
+            allReplays: count(DailyReplay.self),
+            latestReplayGeneratedAt: latestDailyReplay()?.generatedAt
+        )
+    }
+
     func existingDailyReplay(for date: Date = Date()) -> DailyReplay? {
         let day = Calendar.current.startOfDay(for: date)
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
@@ -166,6 +190,20 @@ final class LifeReplayStore {
             return try context.fetch(descriptor).first
         } catch {
             logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    private func latestDailyReplay() -> DailyReplay? {
+        var descriptor = FetchDescriptor<DailyReplay>(
+            sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            logger.error("Failed to fetch latest daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
@@ -350,6 +388,16 @@ final class LifeReplayStore {
             try context.save()
         } catch {
             logger.error("Failed to save refreshed focus analysis: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func count<T: PersistentModel>(_ modelType: T.Type) -> Int {
+        do {
+            let descriptor = FetchDescriptor<T>()
+            return try context.fetchCount(descriptor)
+        } catch {
+            logger.error("Failed to count \(String(describing: modelType), privacy: .public): \(error.localizedDescription, privacy: .public)")
+            return 0
         }
     }
 

@@ -13,6 +13,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dashboard: DashboardWindowController?
     private var categoryEditor: CategoryEditorWindowController?
     private var focusSettingsWindow: FocusSettingsWindowController?
+    private var dataStatusWindow: DataStatusWindowController?
     private var eventCount = 0
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private lazy var collector = MacActivityCollector { [weak self] event in
@@ -71,6 +72,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Focus Drift Settings", action: #selector(openFocusSettings), keyEquivalent: "s"))
+        menu.addItem(NSMenuItem(title: "Data Status", action: #selector(openDataStatus), keyEquivalent: "i"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
@@ -141,6 +143,16 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         focusSettingsWindow?.reload()
         focusSettingsWindow?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    @objc private func openDataStatus() {
+        guard let store else { return }
+        if dataStatusWindow == nil {
+            dataStatusWindow = DataStatusWindowController(store: store)
+        }
+        dataStatusWindow?.reload()
+        dataStatusWindow?.showWindow(nil)
         NSApp.activate()
     }
 
