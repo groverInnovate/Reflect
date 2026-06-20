@@ -14,6 +14,7 @@ final class MacActivityCollector {
     private var observer: NSObjectProtocol?
     private var timer: Timer?
     private var isIdle = false
+    private var frontmostBundleIdentifier: String?
     private var lastBrowserDomain: String?
     private var lastBrowserDomainBundleID: String?
 
@@ -79,6 +80,7 @@ final class MacActivityCollector {
         timer?.invalidate()
         timer = nil
         isIdle = false
+        frontmostBundleIdentifier = nil
         lastBrowserDomain = nil
         lastBrowserDomainBundleID = nil
 
@@ -86,6 +88,7 @@ final class MacActivityCollector {
     }
 
     private func recordApplication(bundleIdentifier: String?, appName: String?, processIdentifier: pid_t?, timestamp: Date) {
+        frontmostBundleIdentifier = bundleIdentifier
         let windowTitle = windowTitleReader.frontWindowTitle(processIdentifier: processIdentifier)
         let event = ActivityEvent(
             timestamp: timestamp,
@@ -110,6 +113,8 @@ final class MacActivityCollector {
             onEvent(ActivityEvent(timestamp: Date(), kind: .idleEnd))
             logger.info("Idle ended")
         }
+
+        recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: Date())
     }
 
     private func secondsSinceRecentInput() -> TimeInterval {

@@ -43,3 +43,7 @@ Added an AppKit category editor using one editable rule per line (`pattern | nam
 ## 2026-06-20 - Persist replay snapshots explicitly
 
 Added manual daily replay generation that saves timeline JSON, focus score, and fallback narrative into `DailyReplay`. The dashboard can still render live data, but saved snapshots give Mohit a stable end-of-day artifact; the alternative was to keep replay purely derived until the UI was more polished.
+
+## 2026-06-20 - Permission UI must show OS state, not assumptions
+
+Updated the menu/dashboard to refresh Accessibility and Notification status from macOS instead of relying on startup-time assumptions. Browser Automation remains prompt-driven because macOS only asks when AppleScript targets a browser; polling the frontmost browser makes that prompt more reliable during real use.

@@ -6,6 +6,8 @@ import LifeReplayCore
 final class DashboardWindowController: NSWindowController {
     private let store: LifeReplayStore
     private let permissions: PermissionController
+    private let notifications: DriftNotificationController
+    private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private let summaryTextView = NSTextView()
     private let timelineTextView = NSTextView()
     private let driftTextView = NSTextView()
@@ -17,9 +19,10 @@ final class DashboardWindowController: NSWindowController {
         return formatter
     }()
 
-    init(store: LifeReplayStore, permissions: PermissionController) {
+    init(store: LifeReplayStore, permissions: PermissionController, notifications: DriftNotificationController) {
         self.store = store
         self.permissions = permissions
+        self.notifications = notifications
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
@@ -41,6 +44,14 @@ final class DashboardWindowController: NSWindowController {
     }
 
     func reload() {
+        notifications.authorizationSummary { [weak self] summary in
+            self?.notificationSummary = summary
+            self?.renderCurrentData()
+        }
+        renderCurrentData()
+    }
+
+    private func renderCurrentData() {
         let data = dashboardData()
         summaryTextView.string = renderSummary(data)
         timelineTextView.string = renderTimeline(data.blocks)
@@ -112,6 +123,7 @@ final class DashboardWindowController: NSWindowController {
             "Permissions",
             "-----------",
             "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval for window titles")",
+            "Notifications: \(notificationSummary.rawValue)",
             "Automation: macOS will ask when Safari/Chrome tab domains are first read",
             "",
             data.savedReplay?.narrativeSummary ?? data.fallbackSummary,

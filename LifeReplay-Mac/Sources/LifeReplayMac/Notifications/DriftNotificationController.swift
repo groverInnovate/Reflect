@@ -5,25 +5,65 @@ import UserNotifications
 
 @MainActor
 final class DriftNotificationController {
+    enum AuthorizationSummary: String {
+        case unavailable = "Unavailable outside app bundle"
+        case notDetermined = "Not requested"
+        case denied = "Denied"
+        case authorized = "Allowed"
+        case provisional = "Provisionally allowed"
+        case ephemeral = "Ephemeral"
+        case unknown = "Unknown"
+    }
+
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Notifications")
-    private var requestedAuthorization = false
     private var isBundledApp: Bool {
         Bundle.main.bundleURL.pathExtension == "app"
     }
 
-    func requestAuthorizationIfNeeded() {
+    func authorizationSummary(completion: @escaping @MainActor (AuthorizationSummary) -> Void) {
+        guard isBundledApp else {
+            completion(.unavailable)
+            return
+        }
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let summary: AuthorizationSummary
+            switch settings.authorizationStatus {
+            case .notDetermined:
+                summary = .notDetermined
+            case .denied:
+                summary = .denied
+            case .authorized:
+                summary = .authorized
+            case .provisional:
+                summary = .provisional
+            case .ephemeral:
+                summary = .ephemeral
+            @unknown default:
+                summary = .unknown
+            }
+            Task { @MainActor in completion(summary) }
+        }
+    }
+
+    func requestAuthorizationIfNeeded(force: Bool = false) {
         guard isBundledApp else {
             logger.info("Notifications disabled while running outside an app bundle")
             return
         }
-        guard !requestedAuthorization else { return }
-        requestedAuthorization = true
 
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { [logger] granted, error in
-            if let error {
-                logger.error("Notification authorization failed: \(error.localizedDescription, privacy: .public)")
-            } else {
-                logger.info("Notification authorization granted: \(granted)")
+        UNUserNotificationCenter.current().getNotificationSettings { [logger] settings in
+            guard force || settings.authorizationStatus == .notDetermined else {
+                logger.info("Notification authorization status is \(settings.authorizationStatus.rawValue)")
+                return
+            }
+
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+                if let error {
+                    logger.error("Notification authorization failed: \(error.localizedDescription, privacy: .public)")
+                } else {
+                    logger.info("Notification authorization granted: \(granted)")
+                }
             }
         }
     }

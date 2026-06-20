@@ -65,4 +65,6 @@
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Replaced the single-pane dashboard with Summary, Timeline, Drift Events, and Raw Events tabs.
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Next best step: run the bundled app during a real session to validate capture accuracy and macOS permission prompts.
+- Fixed permission/status reporting: menu refreshes when opened, notification status is visible, and browser-domain reads retry while a browser stays frontmost.
+- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- If Accessibility still says "Needs Approval" after the toggle is on, quit and reopen `.build/LifeReplayMac.app`; macOS TCC can require a process restart after approval.

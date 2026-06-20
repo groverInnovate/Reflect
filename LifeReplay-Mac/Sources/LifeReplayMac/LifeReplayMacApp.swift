@@ -4,7 +4,7 @@ import OSLog
 
 @MainActor
 @main
-final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
+final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
     private let permissions = PermissionController()
     private let notifications = DriftNotificationController()
@@ -13,6 +13,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
     private var dashboard: DashboardWindowController?
     private var categoryEditor: CategoryEditorWindowController?
     private var eventCount = 0
+    private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private lazy var collector = MacActivityCollector { [weak self] event in
         guard let self else { return }
         self.store?.record(event)
@@ -51,12 +52,14 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "Life Replay"
         statusItem = item
+        updateNotificationSummary()
     }
 
     private func updateMenu() {
         statusItem?.button?.title = "Life Replay \(eventCount)"
 
         let menu = NSMenu()
+        menu.delegate = self
         let toggleTitle = collector.isRunning ? "Pause Collection" : "Resume Collection"
         let accessibilityTitle = permissions.isAccessibilityTrusted ? "Accessibility: Allowed" : "Accessibility: Needs Approval"
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleCollection), keyEquivalent: "p"))
@@ -67,10 +70,25 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
+    }
+
+    nonisolated func menuWillOpen(_ menu: NSMenu) {
+        Task { @MainActor in
+            updateNotificationSummary()
+            updateMenu()
+        }
+    }
+
+    private func updateNotificationSummary() {
+        notifications.authorizationSummary { [weak self] summary in
+            self?.notificationSummary = summary
+            self?.updateMenu()
+        }
     }
 
     @objc private func toggleCollection() {
@@ -93,7 +111,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         }
 
         if dashboard == nil {
-            dashboard = DashboardWindowController(store: store, permissions: permissions)
+            dashboard = DashboardWindowController(store: store, permissions: permissions, notifications: notifications)
         }
         dashboard?.reload()
         dashboard?.showWindow(nil)
@@ -143,6 +161,11 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
             permissions.openAccessibilitySettings()
         }
         updateMenu()
+    }
+
+    @objc private func requestNotifications() {
+        notifications.requestAuthorizationIfNeeded(force: true)
+        updateNotificationSummary()
     }
 
     @objc private func openAutomationSettings() {
