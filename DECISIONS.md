@@ -59,3 +59,7 @@ Added Foundation Models summarization only behind `macOS 26` availability and ru
 ## 2026-06-20 - Persist tunable drift thresholds
 
 Added `FocusSettings` in SwiftData and a small settings window so drift thresholds can be tuned from real feedback. The alternative was to leave constants hardcoded until later, but Phase 2 acceptance depends on calibrating against Mohit's actual work patterns.
+
+## 2026-06-20 - Show idle as replay blocks
+
+Idle start/end events now generate neutral "Idle period" timeline blocks. This makes away-from-keyboard periods visible in the daily story; the alternative was to leave idle only in the raw event log, which made replay summaries under-explain breaks.

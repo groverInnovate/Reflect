@@ -16,7 +16,17 @@ public struct ReplayEngine: Sendable {
     }
 
     public func timelineBlocks(from sessions: [FocusSession]) -> [TimelineBlock] {
-        let sortedSessions = sessions
+        mergeBlocks(sessionBlocks(from: sessions))
+    }
+
+    public func timelineBlocks(from sessions: [FocusSession], events: [ActivityEvent], now: Date = Date()) -> [TimelineBlock] {
+        let sessionBlocks = sessionBlocks(from: sessions)
+        let idleBlocks = idleTimelineBlocks(from: events, now: now)
+        return mergeBlocks((sessionBlocks + idleBlocks).sorted { $0.start < $1.start })
+    }
+
+    private func sessionBlocks(from sessions: [FocusSession]) -> [TimelineBlock] {
+        sessions
             .compactMap { session -> TimelineBlock? in
                 guard let end = session.end, end > session.start else { return nil }
                 return TimelineBlock(
@@ -28,15 +38,56 @@ public struct ReplayEngine: Sendable {
                 )
             }
             .sorted { $0.start < $1.start }
+    }
 
-        return sortedSessions.reduce(into: [TimelineBlock]()) { blocks, next in
+    private func idleTimelineBlocks(from events: [ActivityEvent], now: Date) -> [TimelineBlock] {
+        let ordered = events.sorted { $0.timestamp < $1.timestamp }
+        var idleStart: Date?
+        var blocks: [TimelineBlock] = []
+
+        for event in ordered {
+            switch event.kind {
+            case .idleStart:
+                idleStart = event.timestamp
+            case .idleEnd:
+                if let start = idleStart, event.timestamp > start {
+                    blocks.append(TimelineBlock(
+                        start: start,
+                        end: event.timestamp,
+                        label: "Idle period",
+                        category: .neutral,
+                        detail: "No keyboard or mouse input"
+                    ))
+                }
+                idleStart = nil
+            case .appActivated, .browserDomain:
+                continue
+            }
+        }
+
+        if let start = idleStart, now > start {
+            blocks.append(TimelineBlock(
+                start: start,
+                end: now,
+                label: "Idle period",
+                category: .neutral,
+                detail: "No keyboard or mouse input"
+            ))
+        }
+
+        return blocks
+    }
+
+    private func mergeBlocks(_ sortedBlocks: [TimelineBlock]) -> [TimelineBlock] {
+        sortedBlocks.reduce(into: [TimelineBlock]()) { blocks, next in
             guard var previous = blocks.last else {
                 blocks.append(next)
                 return
             }
 
             let gap = next.start.timeIntervalSince(previous.end)
-            if previous.category == next.category, gap <= configuration.mergeGap {
+            let overlaps = next.start < previous.end
+            if previous.category == next.category, gap <= configuration.mergeGap, !overlaps {
                 previous.end = max(previous.end, next.end)
                 if !previous.label.contains(next.label) {
                     previous.detail = [previous.detail, next.label].compactMap(\.self).joined(separator: ", ")

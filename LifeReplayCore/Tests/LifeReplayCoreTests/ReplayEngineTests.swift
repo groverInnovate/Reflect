@@ -54,4 +54,20 @@ struct ReplayEngineTests {
 
         #expect(decoded == blocks)
     }
+
+    @Test("idle events appear as timeline blocks")
+    func idleEventsAppearAsTimelineBlocks() {
+        let start = Date(timeIntervalSince1970: 0)
+        let sessions = [
+            FocusSession(start: start, end: start.addingTimeInterval(600), category: .productive, primaryAppName: "VS Code"),
+        ]
+        let events = [
+            ActivityEvent(timestamp: start.addingTimeInterval(900), kind: .idleStart),
+            ActivityEvent(timestamp: start.addingTimeInterval(1_200), kind: .idleEnd),
+        ]
+
+        let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(1_500))
+
+        #expect(blocks.contains { $0.label == "Idle period" && $0.start == start.addingTimeInterval(900) })
+    }
 }

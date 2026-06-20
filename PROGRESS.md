@@ -75,3 +75,5 @@
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added `FocusSettings` persistence and a Focus Drift Settings window for threshold tuning.
 - `swift test` passes with 8 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added idle periods to generated timeline blocks.
+- `swift test` passes with 9 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
