@@ -17,3 +17,10 @@ The MVP is intentionally Mac-only and free-signing friendly: no CloudKit, no Scr
 swift test
 swift run LifeReplayMac
 ```
+
+For a proper macOS app bundle, which is needed for notification prompts:
+
+```sh
+scripts/build-mac-app.sh
+open .build/LifeReplayMac.app
+```

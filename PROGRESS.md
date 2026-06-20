@@ -5,6 +5,7 @@
 - [ ] Phase 0 - Project setup + capability probe
   - [x] Repo documentation created: `AGENTS.md`, `DECISIONS.md`, `PROGRESS.md`
   - [x] Swift package scaffolded with `LifeReplayCore` and `LifeReplayMac` targets
+  - [x] Script-built macOS `.app` bundle path added
   - [ ] Xcode workspace/project configured for free Personal Team signing
   - [ ] Empty macOS menu bar app builds and launches on-device
   - [ ] HealthKit probe run on physical iPhone and result documented
@@ -53,4 +54,5 @@
 - Added live focus analysis after each captured event, persisted generated sessions/drifts, and displayed drift details in the dashboard.
 - Added local drift notifications for bundled app runs; notifications are intentionally skipped under raw `swift run` because macOS requires a real app bundle.
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
-- Next best step: create a proper Xcode app bundle/project so Mohit can sign in, approve prompts, and verify Phase 1/2 on-device behavior.
+- Added `scripts/build-mac-app.sh`; `.build/LifeReplayMac.app` launches successfully through `open`.
+- Next best step: have Mohit run the bundled app, approve macOS prompts, and verify Phase 1/2 behavior during a real work session. Xcode signing is still only needed when we start the Xcode project/iPhone HealthKit probe path.

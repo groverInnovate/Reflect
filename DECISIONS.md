@@ -31,3 +31,7 @@ Added an optional `windowTitle` field to `ActivityEvent` and capture it through 
 ## 2026-06-20 - Notifications require a real app bundle
 
 Local drift notifications are guarded behind a `.app` bundle check because `UNUserNotificationCenter.current()` crashes when launched as a raw SwiftPM executable from `.build`. `swift run` remains useful for collector/dashboard smoke tests; notification prompts will be verified through the bundled/Xcode app path.
+
+## 2026-06-20 - Add script-built Mac app bundle before Xcode project
+
+Added `scripts/build-mac-app.sh` to wrap the SwiftPM executable in a local `.app` bundle with the needed Info.plist keys. This lets Mohit test menu bar behavior and notification/Automation prompts before we invest in hand-maintaining an Xcode project; the alternative was to make Xcode setup the immediate blocker.
