@@ -87,3 +87,4 @@
 - Added a read-only Replay History window for saved daily replays.
 - Added optional Launch at Login menu toggle.
 - Pause/resume collection now persists across app relaunches.
+- Added JSON export for category rules and focus settings.

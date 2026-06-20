@@ -90,6 +90,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Export Configuration...", action: #selector(exportConfiguration), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Focus Drift Settings", action: #selector(openFocusSettings), keyEquivalent: "s"))
         menu.addItem(NSMenuItem(title: "Data Status", action: #selector(openDataStatus), keyEquivalent: "i"))
@@ -232,6 +233,23 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try store.exportTodayDebugData(to: url)
                 } catch {
                     self?.logger.error("Failed to export debug CSVs: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    @objc private func exportConfiguration() {
+        guard let store else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "Life Replay Configuration.json"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                do {
+                    try store.exportConfiguration(to: url)
+                } catch {
+                    self?.logger.error("Failed to export configuration: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }

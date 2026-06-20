@@ -20,6 +20,27 @@ struct DataStatus {
     var latestReplayGeneratedAt: Date?
 }
 
+private struct ConfigurationExport: Codable {
+    var exportedAt: Date
+    var categories: [CategoryExport]
+    var focusSettings: FocusSettingsExport
+}
+
+private struct CategoryExport: Codable {
+    var matchPattern: String
+    var displayName: String
+    var category: String
+    var isUserEdited: Bool
+}
+
+private struct FocusSettingsExport: Codable {
+    var idleThresholdSeconds: Double
+    var sessionMinimumDurationSeconds: Double
+    var driftWindowMinutes: Double
+    var baselineSwitchesPerHour: Double
+    var productiveSessionMinimumMinutes: Double
+}
+
 @MainActor
 final class LifeReplayStore {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Store")
@@ -272,6 +293,34 @@ final class LifeReplayStore {
             atomically: true,
             encoding: .utf8
         )
+    }
+
+    func exportConfiguration(to url: URL) throws {
+        let settings = focusSettings()
+        let export = ConfigurationExport(
+            exportedAt: Date(),
+            categories: categories().map {
+                CategoryExport(
+                    matchPattern: $0.matchPattern,
+                    displayName: $0.displayName,
+                    category: $0.category.rawValue,
+                    isUserEdited: $0.isUserEdited
+                )
+            },
+            focusSettings: FocusSettingsExport(
+                idleThresholdSeconds: settings.idleThresholdSeconds,
+                sessionMinimumDurationSeconds: settings.sessionMinimumDurationSeconds,
+                driftWindowMinutes: settings.driftWindowMinutes,
+                baselineSwitchesPerHour: settings.baselineSwitchesPerHour,
+                productiveSessionMinimumMinutes: settings.productiveSessionMinimumMinutes
+            )
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(export)
+        try data.write(to: url, options: .atomic)
     }
 
     func categorySeeds() -> [AppCategorySeed] {
