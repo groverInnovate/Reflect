@@ -8,6 +8,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
     private let permissions = PermissionController()
     private let notifications = DriftNotificationController()
+    private let launchAtLogin = LaunchAtLoginController()
     private var statusItem: NSStatusItem?
     private var store: LifeReplayStore?
     private var dashboard: DashboardWindowController?
@@ -82,6 +83,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Capture Current Browser Tab", action: #selector(captureCurrentBrowserTab), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show Permission Diagnostics", action: #selector(showPermissionDiagnostics), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Launch at Login: \(launchAtLogin.statusDescription)", action: #selector(toggleLaunchAtLogin), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -252,6 +254,11 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openAutomationSettings() {
         permissions.openAutomationSettings()
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        launchAtLogin.toggle()
+        updateMenu()
     }
 
     @objc private func showPermissionDiagnostics() {
