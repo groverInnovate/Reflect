@@ -82,3 +82,4 @@
 - Focus scoring now subtracts idle overlap from sessions.
 - `swift test` passes with 10 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added a manual browser-tab capture action for immediate Automation/domain verification.
+- Added local CSV export for today's raw events and drift events.

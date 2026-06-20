@@ -68,6 +68,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
+        menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "Focus Drift Settings", action: #selector(openFocusSettings), keyEquivalent: "s"))
         menu.addItem(.separator())
@@ -167,6 +168,25 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try store.markdownForDailyReplay(replay).write(to: url, atomically: true, encoding: .utf8)
                 } catch {
                     self?.logger.error("Failed to export daily replay: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    @objc private func exportDebugCSVs() {
+        guard let store else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Export"
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                do {
+                    try store.exportTodayDebugData(to: url)
+                } catch {
+                    self?.logger.error("Failed to export debug CSVs: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }

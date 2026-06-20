@@ -205,6 +205,23 @@ final class LifeReplayStore {
         return lines.joined(separator: "\n") + "\n"
     }
 
+    func exportTodayDebugData(to folderURL: URL, now: Date = Date()) throws {
+        let events = eventsForToday(now: now)
+        let analysis = makeFocusEngine().analyze(events: events, now: now)
+        let day = Calendar.current.startOfDay(for: now).formatted(.iso8601.year().month().day())
+
+        try csvForActivityEvents(events).write(
+            to: folderURL.appendingPathComponent("life-replay-events-\(day).csv"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try csvForDriftEvents(analysis.driftEvents).write(
+            to: folderURL.appendingPathComponent("life-replay-drifts-\(day).csv"),
+            atomically: true,
+            encoding: .utf8
+        )
+    }
+
     func categorySeeds() -> [AppCategorySeed] {
         categories().map {
             AppCategorySeed($0.matchPattern, $0.displayName, $0.category)
@@ -339,6 +356,44 @@ final class LifeReplayStore {
     private func driftKey(_ event: DriftEvent) -> String {
         let triggerKey = event.triggerAppNames.sorted().joined(separator: "|")
         return "\(Int(event.timestamp.timeIntervalSince1970))-\(event.switchCountInWindow)-\(triggerKey)"
+    }
+
+    private func csvForActivityEvents(_ events: [ActivityEvent]) -> String {
+        var rows = ["timestamp,kind,appBundleID,appName,windowTitle,browserDomain,source"]
+        rows += events.map {
+            [
+                $0.timestamp.ISO8601Format(),
+                $0.kind.rawValue,
+                $0.appBundleID ?? "",
+                $0.appName ?? "",
+                $0.windowTitle ?? "",
+                $0.browserDomain ?? "",
+                $0.source,
+            ].map(csvEscape).joined(separator: ",")
+        }
+        return rows.joined(separator: "\n") + "\n"
+    }
+
+    private func csvForDriftEvents(_ drifts: [DriftEvent]) -> String {
+        var rows = ["timestamp,triggerAppNames,switchCountInWindow,baselineSwitchRate,severity"]
+        rows += drifts.map {
+            [
+                $0.timestamp.ISO8601Format(),
+                $0.triggerAppNames.joined(separator: "; "),
+                String($0.switchCountInWindow),
+                String($0.baselineSwitchRate),
+                String($0.severity),
+            ].map(csvEscape).joined(separator: ",")
+        }
+        return rows.joined(separator: "\n") + "\n"
+    }
+
+    private func csvEscape(_ value: String) -> String {
+        let escaped = value.replacingOccurrences(of: "\"", with: "\"\"")
+        if escaped.contains(",") || escaped.contains("\n") || escaped.contains("\"") {
+            return "\"\(escaped)\""
+        }
+        return escaped
     }
 
     private func seedDefaultCategoriesIfNeeded() throws {
