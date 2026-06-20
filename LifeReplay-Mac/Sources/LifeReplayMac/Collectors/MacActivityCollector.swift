@@ -9,9 +9,12 @@ final class MacActivityCollector {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "ActivityCollector")
     private let idleThreshold: TimeInterval
     private let onEvent: (ActivityEvent) -> Void
+    private let browserDomainReader = BrowserDomainReader()
     private var observer: NSObjectProtocol?
     private var timer: Timer?
     private var isIdle = false
+    private var lastBrowserDomain: String?
+    private var lastBrowserDomainBundleID: String?
 
     private(set) var isRunning = false
 
@@ -64,6 +67,8 @@ final class MacActivityCollector {
         timer?.invalidate()
         timer = nil
         isIdle = false
+        lastBrowserDomain = nil
+        lastBrowserDomainBundleID = nil
 
         logger.info("Mac activity collector stopped")
     }
@@ -77,6 +82,7 @@ final class MacActivityCollector {
         )
         logger.debug("Activated app: \(event.appName ?? "Unknown", privacy: .public)")
         onEvent(event)
+        recordBrowserDomainIfAvailable(bundleIdentifier: bundleIdentifier, timestamp: timestamp)
     }
 
     private func pollIdleState() {
@@ -97,5 +103,26 @@ final class MacActivityCollector {
         return eventTypes
             .map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) }
             .min() ?? 0
+    }
+
+    private func recordBrowserDomainIfAvailable(bundleIdentifier: String?, timestamp: Date) {
+        guard let domain = browserDomainReader.domainForFrontmostBrowser(bundleIdentifier: bundleIdentifier) else {
+            return
+        }
+        guard domain != lastBrowserDomain || bundleIdentifier != lastBrowserDomainBundleID else {
+            return
+        }
+
+        lastBrowserDomain = domain
+        lastBrowserDomainBundleID = bundleIdentifier
+
+        let event = ActivityEvent(
+            timestamp: timestamp,
+            kind: .browserDomain,
+            appBundleID: bundleIdentifier,
+            browserDomain: domain
+        )
+        logger.debug("Browser domain: \(domain, privacy: .public)")
+        onEvent(event)
     }
 }

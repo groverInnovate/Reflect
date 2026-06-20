@@ -19,3 +19,7 @@ Implemented the first macOS collector as an in-memory menu bar flow that records
 ## 2026-06-20 - Native text dashboard before designed SwiftUI dashboard
 
 Added a simple AppKit dashboard backed by SwiftData that shows today's score, timeline, and raw events. This gives a verifiable Phase 1 inspection surface immediately; the alternative was to wait for the fuller Phase 3 SwiftUI dashboard before making captured data visible.
+
+## 2026-06-20 - AppleScript browser domains before richer browser extensions
+
+Implemented Safari/Chrome-family domain capture with AppleScript on frontmost browser activation. This matches the $0 local-first constraint and uses the standard Automation prompt; the alternative was a browser extension, which would add a separate install/debug surface before the Mac collector is stable.

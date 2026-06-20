@@ -6,6 +6,7 @@ import OSLog
 @main
 final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
+    private let permissions = PermissionController()
     private var statusItem: NSStatusItem?
     private var store: LifeReplayStore?
     private var dashboard: DashboardWindowController?
@@ -50,9 +51,13 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         let toggleTitle = collector.isRunning ? "Pause Collection" : "Resume Collection"
+        let accessibilityTitle = permissions.isAccessibilityTrusted ? "Accessibility: Allowed" : "Accessibility: Needs Approval"
         menu.addItem(NSMenuItem(title: toggleTitle, action: #selector(toggleCollection), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
@@ -83,6 +88,18 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         dashboard?.reload()
         dashboard?.showWindow(nil)
         NSApp.activate()
+    }
+
+    @objc private func requestAccessibility() {
+        permissions.requestAccessibilityPermission()
+        if !permissions.isAccessibilityTrusted {
+            permissions.openAccessibilitySettings()
+        }
+        updateMenu()
+    }
+
+    @objc private func openAutomationSettings() {
+        permissions.openAutomationSettings()
     }
 
     @objc private func quit() {
