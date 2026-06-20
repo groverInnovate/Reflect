@@ -3,6 +3,12 @@ import LifeReplayCore
 import OSLog
 import SwiftData
 
+private struct ReplaySnapshot {
+    var analysis: FocusAnalysis
+    var blocks: [TimelineBlock]
+    var fallbackSummary: String
+}
+
 @MainActor
 final class LifeReplayStore {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Store")
@@ -44,29 +50,61 @@ final class LifeReplayStore {
     }
 
     func generateDailyReplay(now: Date = Date()) -> DailyReplay? {
+        generateDailyReplaySnapshot(now: now, narrative: nil, usedOnDeviceAI: false)
+    }
+
+    func generateDailyReplayWithNarrative(now: Date = Date()) async -> DailyReplay? {
+        let snapshot = replaySnapshot(now: now)
+        let narrative = await OnDeviceNarrativeService().generate(
+            blocks: snapshot.blocks,
+            driftEvents: snapshot.analysis.driftEvents,
+            focusScore: snapshot.analysis.focusScore,
+            fallback: snapshot.fallbackSummary
+        )
+        return generateDailyReplaySnapshot(
+            now: now,
+            narrative: narrative.summary,
+            usedOnDeviceAI: narrative.usedOnDeviceAI,
+            snapshot: snapshot
+        )
+    }
+
+    private func replaySnapshot(now: Date) -> ReplaySnapshot {
         let events = eventsForToday(now: now)
         let analysis = makeFocusEngine().analyze(events: events, now: now)
         let replayEngine = ReplayEngine()
         let blocks = replayEngine.timelineBlocks(from: analysis.sessions)
+        let fallbackSummary = replayEngine.fallbackSummary(
+            blocks: blocks,
+            driftEvents: analysis.driftEvents,
+            focusScore: analysis.focusScore
+        )
+        return ReplaySnapshot(analysis: analysis, blocks: blocks, fallbackSummary: fallbackSummary)
+    }
 
+    private func generateDailyReplaySnapshot(
+        now: Date,
+        narrative: String?,
+        usedOnDeviceAI: Bool,
+        snapshot providedSnapshot: ReplaySnapshot? = nil
+    ) -> DailyReplay? {
+        let snapshot = providedSnapshot ?? replaySnapshot(now: now)
+        let replayEngine = ReplayEngine()
         do {
-            let json = try replayEngine.encode(blocks: blocks)
-            let replay = existingDailyReplay(for: now) ?? DailyReplay(
+            let json = try replayEngine.encode(blocks: snapshot.blocks)
+            let existingReplay = existingDailyReplay(for: now)
+            let replay = existingReplay ?? DailyReplay(
                 date: Calendar.current.startOfDay(for: now),
                 timelineBlocksJSON: json,
-                focusScore: analysis.focusScore
+                focusScore: snapshot.analysis.focusScore
             )
             replay.timelineBlocksJSON = json
-            replay.focusScore = analysis.focusScore
-            replay.narrativeSummary = replayEngine.fallbackSummary(
-                blocks: blocks,
-                driftEvents: analysis.driftEvents,
-                focusScore: analysis.focusScore
-            )
+            replay.focusScore = snapshot.analysis.focusScore
+            replay.narrativeSummary = narrative ?? snapshot.fallbackSummary
             replay.generatedAt = Date()
-            replay.usedOnDeviceAI = false
+            replay.usedOnDeviceAI = usedOnDeviceAI
 
-            if existingDailyReplay(for: now) == nil {
+            if existingReplay == nil {
                 context.insert(replay)
             }
             try context.save()

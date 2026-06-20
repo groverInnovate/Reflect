@@ -33,7 +33,7 @@
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
   - [x] Deterministic fallback summary implemented
-  - [ ] Foundation Models path implemented behind availability checks
+  - [x] Foundation Models path implemented behind availability checks
 - [ ] Phase 5 - Optional iPhone companion
   - [ ] Not started
 - [ ] Phase 6 - Further stretch
@@ -70,3 +70,5 @@
 - If Accessibility still says "Needs Approval" after the toggle is on, quit and reopen `.build/LifeReplayMac.app`; macOS TCC can require a process restart after approval.
 - Stabilized the generated app signature identifier as `com.mohitgrover.LifeReplayMac`; Mohit may need to remove the old Accessibility row and approve the new signed identity once.
 - When Notifications are denied, the menu now opens macOS Notification Settings instead of attempting a re-prompt that macOS will not show.
+- Added optional Foundation Models daily replay narratives with deterministic fallback on unsupported devices/OS versions.
+- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

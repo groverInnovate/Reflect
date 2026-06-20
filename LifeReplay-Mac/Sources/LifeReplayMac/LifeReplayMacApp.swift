@@ -131,9 +131,11 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func generateDailyReplay() {
         guard let store else { return }
-        _ = store.generateDailyReplay()
-        dashboard?.reload()
-        updateMenu()
+        Task { @MainActor in
+            _ = await store.generateDailyReplayWithNarrative()
+            dashboard?.reload()
+            updateMenu()
+        }
     }
 
     @objc private func exportDailyReplay() {

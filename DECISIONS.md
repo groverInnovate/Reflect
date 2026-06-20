@@ -51,3 +51,7 @@ Updated the menu/dashboard to refresh Accessibility and Notification status from
 ## 2026-06-20 - Stabilize local app code identity for TCC
 
 The script-built app was ad-hoc signed with a generated hash identifier, so macOS Accessibility could approve one build while the next build looked like a different app. The bundle script now signs with `com.mohitgrover.LifeReplayMac`; the old TCC entry may need to be removed/regranted once.
+
+## 2026-06-20 - Foundation Models as optional narrative layer
+
+Added Foundation Models summarization only behind `macOS 26` availability and runtime model availability checks. If the framework, hardware, Apple Intelligence setting, or generation call is unavailable, `DailyReplay` keeps using the deterministic fallback summary.
