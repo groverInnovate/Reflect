@@ -63,3 +63,7 @@ Added `FocusSettings` in SwiftData and a small settings window so drift threshol
 ## 2026-06-20 - Show idle as replay blocks
 
 Idle start/end events now generate neutral "Idle period" timeline blocks. This makes away-from-keyboard periods visible in the daily story; the alternative was to leave idle only in the raw event log, which made replay summaries under-explain breaks.
+
+## 2026-06-20 - Subtract idle overlap from focus sessions
+
+The focus engine now computes idle overlap per session before scoring. Without this, a long VS Code session could incorrectly count as productive time while Mohit was away from the keyboard.

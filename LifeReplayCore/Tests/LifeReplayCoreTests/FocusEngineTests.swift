@@ -56,6 +56,21 @@ struct FocusEngineTests {
 
         #expect(engine.score(sessions: productive, driftEvents: []) > engine.score(sessions: distracted, driftEvents: []))
     }
+
+    @Test("idle overlap is applied to sessions")
+    func idleOverlapIsAppliedToSessions() {
+        let start = Date(timeIntervalSince1970: 0)
+        let events = [
+            event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            ActivityEvent(timestamp: start.addingTimeInterval(300), kind: .idleStart),
+            ActivityEvent(timestamp: start.addingTimeInterval(600), kind: .idleEnd),
+            event(start.addingTimeInterval(900), app: "Terminal", bundle: "com.apple.Terminal"),
+        ]
+
+        let analysis = FocusEngine().analyze(events: events)
+
+        #expect(analysis.sessions.first?.idleSeconds == 300)
+    }
 }
 
 private func event(_ timestamp: Date, app: String? = nil, bundle: String? = nil, domain: String? = nil) -> ActivityEvent {

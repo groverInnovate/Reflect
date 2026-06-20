@@ -43,6 +43,7 @@ public struct FocusEngine: Sendable {
     public func analyze(events: [ActivityEvent], now: Date? = nil) -> FocusAnalysis {
         let orderedEvents = events.sorted { $0.timestamp < $1.timestamp }
         let sessions = buildSessions(from: orderedEvents, now: now)
+        applyIdleDurations(to: sessions, events: orderedEvents, now: now ?? orderedEvents.last?.timestamp ?? Date())
         let drifts = detectDrift(in: orderedEvents, sessions: sessions)
         let score = score(sessions: sessions, driftEvents: drifts)
         return FocusAnalysis(sessions: sessions, driftEvents: drifts, focusScore: score)
@@ -105,6 +106,44 @@ public struct FocusEngine: Sendable {
         current.end = now ?? meaningfulEvents.last?.timestamp ?? current.start
         sessions.append(current)
         return sessions
+    }
+
+    private func applyIdleDurations(to sessions: [FocusSession], events: [ActivityEvent], now: Date) {
+        let intervals = idleIntervals(from: events, now: now)
+        for session in sessions {
+            guard let sessionEnd = session.end else { continue }
+            let idleSeconds = intervals.reduce(0.0) { total, interval in
+                let overlapStart = max(session.start, interval.start)
+                let overlapEnd = min(sessionEnd, interval.end)
+                guard overlapEnd > overlapStart else { return total }
+                return total + overlapEnd.timeIntervalSince(overlapStart)
+            }
+            session.idleSeconds = Int(idleSeconds.rounded())
+        }
+    }
+
+    private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
+        var intervals: [(start: Date, end: Date)] = []
+        var idleStart: Date?
+
+        for event in events {
+            switch event.kind {
+            case .idleStart:
+                idleStart = event.timestamp
+            case .idleEnd:
+                if let start = idleStart, event.timestamp > start {
+                    intervals.append((start, event.timestamp))
+                }
+                idleStart = nil
+            case .appActivated, .browserDomain:
+                continue
+            }
+        }
+
+        if let start = idleStart, now > start {
+            intervals.append((start, now))
+        }
+        return intervals
     }
 
     private func detectDrift(in events: [ActivityEvent], sessions: [FocusSession]) -> [DriftEvent] {
