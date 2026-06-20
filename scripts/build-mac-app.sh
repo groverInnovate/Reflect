@@ -44,4 +44,6 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+codesign --force --deep --sign - --identifier com.mohitgrover.LifeReplayMac "$APP_DIR" >/dev/null
+
 echo "$APP_DIR"

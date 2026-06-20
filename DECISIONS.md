@@ -47,3 +47,7 @@ Added manual daily replay generation that saves timeline JSON, focus score, and 
 ## 2026-06-20 - Permission UI must show OS state, not assumptions
 
 Updated the menu/dashboard to refresh Accessibility and Notification status from macOS instead of relying on startup-time assumptions. Browser Automation remains prompt-driven because macOS only asks when AppleScript targets a browser; polling the frontmost browser makes that prompt more reliable during real use.
+
+## 2026-06-20 - Stabilize local app code identity for TCC
+
+The script-built app was ad-hoc signed with a generated hash identifier, so macOS Accessibility could approve one build while the next build looked like a different app. The bundle script now signs with `com.mohitgrover.LifeReplayMac`; the old TCC entry may need to be removed/regranted once.

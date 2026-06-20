@@ -68,3 +68,4 @@
 - Fixed permission/status reporting: menu refreshes when opened, notification status is visible, and browser-domain reads retry while a browser stays frontmost.
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - If Accessibility still says "Needs Approval" after the toggle is on, quit and reopen `.build/LifeReplayMac.app`; macOS TCC can require a process restart after approval.
+- Stabilized the generated app signature identifier as `com.mohitgrover.LifeReplayMac`; Mohit may need to remove the old Accessibility row and approve the new signed identity once.

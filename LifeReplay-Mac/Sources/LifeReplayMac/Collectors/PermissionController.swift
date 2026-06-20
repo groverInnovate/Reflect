@@ -11,6 +11,16 @@ final class PermissionController {
         AXIsProcessTrusted()
     }
 
+    var diagnosticSummary: String {
+        let bundle = Bundle.main
+        return """
+        Accessibility trusted: \(isAccessibilityTrusted)
+        Bundle identifier: \(bundle.bundleIdentifier ?? "nil")
+        Bundle path: \(bundle.bundleURL.path)
+        Executable path: \(bundle.executableURL?.path ?? "nil")
+        """
+    }
+
     func requestAccessibilityPermission() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)
