@@ -88,3 +88,4 @@
 - Added optional Launch at Login menu toggle.
 - Pause/resume collection now persists across app relaunches.
 - Added JSON export for category rules and focus settings.
+- Added a local weekly rollup window over saved daily replays.

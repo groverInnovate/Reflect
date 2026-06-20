@@ -20,6 +20,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var focusSettingsWindow: FocusSettingsWindowController?
     private var dataStatusWindow: DataStatusWindowController?
     private var replayHistoryWindow: ReplayHistoryWindowController?
+    private var weeklyRollupWindow: WeeklyRollupWindowController?
     private var eventCount = 0
     private var collectionEnabled: Bool {
         get {
@@ -87,6 +88,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Raw events today: \(eventCount)", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Dashboard", action: #selector(openDashboard), keyEquivalent: "d"))
         menu.addItem(NSMenuItem(title: "Replay History", action: #selector(openReplayHistory), keyEquivalent: "h"))
+        menu.addItem(NSMenuItem(title: "Weekly Rollup", action: #selector(openWeeklyRollup), keyEquivalent: "w"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
@@ -187,6 +189,16 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         replayHistoryWindow?.reload()
         replayHistoryWindow?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    @objc private func openWeeklyRollup() {
+        guard let store else { return }
+        if weeklyRollupWindow == nil {
+            weeklyRollupWindow = WeeklyRollupWindowController(store: store)
+        }
+        weeklyRollupWindow?.reload()
+        weeklyRollupWindow?.showWindow(nil)
         NSApp.activate()
     }
 

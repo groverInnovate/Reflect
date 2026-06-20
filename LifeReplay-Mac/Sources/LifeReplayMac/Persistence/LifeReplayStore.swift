@@ -20,6 +20,13 @@ struct DataStatus {
     var latestReplayGeneratedAt: Date?
 }
 
+struct WeeklyRollup {
+    var days: Int
+    var averageFocusScore: Int
+    var bestDay: DailyReplay?
+    var latestDays: [DailyReplay]
+}
+
 private struct ConfigurationExport: Codable {
     var exportedAt: Date
     var categories: [CategoryExport]
@@ -227,6 +234,32 @@ final class LifeReplayStore {
             logger.error("Failed to fetch daily replay history: \(error.localizedDescription, privacy: .public)")
             return []
         }
+    }
+
+    func weeklyRollup(now: Date = Date()) -> WeeklyRollup {
+        let calendar = Calendar.current
+        let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+        let predicate = #Predicate<DailyReplay> { replay in
+            replay.date >= start && replay.date <= now
+        }
+        let descriptor = FetchDescriptor<DailyReplay>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
+        )
+
+        let replays: [DailyReplay]
+        do {
+            replays = try context.fetch(descriptor)
+        } catch {
+            logger.error("Failed to fetch weekly rollup: \(error.localizedDescription, privacy: .public)")
+            replays = []
+        }
+
+        let average = replays.isEmpty
+            ? 0
+            : Int((Double(replays.reduce(0) { $0 + $1.focusScore }) / Double(replays.count)).rounded())
+        let best = replays.max { $0.focusScore < $1.focusScore }
+        return WeeklyRollup(days: replays.count, averageFocusScore: average, bestDay: best, latestDays: replays)
     }
 
     private func latestDailyReplay() -> DailyReplay? {
