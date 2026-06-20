@@ -23,11 +23,13 @@ final class LifeReplayStore {
             DriftEvent.self,
             HealthSnapshot.self,
             DailyReplay.self,
+            FocusSettings.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         container = try ModelContainer(for: schema, configurations: [configuration])
         context = ModelContext(container)
         try seedDefaultCategoriesIfNeeded()
+        try seedFocusSettingsIfNeeded()
     }
 
     func record(_ event: ActivityEvent) {
@@ -210,7 +212,49 @@ final class LifeReplayStore {
     }
 
     func makeFocusEngine() -> FocusEngine {
-        FocusEngine(resolver: CategoryResolver(seeds: categorySeeds()))
+        FocusEngine(
+            configuration: focusSettings().focusEngineConfiguration,
+            resolver: CategoryResolver(seeds: categorySeeds())
+        )
+    }
+
+    func focusSettings() -> FocusSettings {
+        var descriptor = FetchDescriptor<FocusSettings>()
+        descriptor.fetchLimit = 1
+        do {
+            if let settings = try context.fetch(descriptor).first {
+                return settings
+            }
+        } catch {
+            logger.error("Failed to fetch focus settings: \(error.localizedDescription, privacy: .public)")
+        }
+
+        let settings = FocusSettings()
+        context.insert(settings)
+        try? context.save()
+        return settings
+    }
+
+    func updateFocusSettings(
+        idleThresholdSeconds: Double,
+        sessionMinimumDurationSeconds: Double,
+        driftWindowMinutes: Double,
+        baselineSwitchesPerHour: Double,
+        productiveSessionMinimumMinutes: Double
+    ) {
+        let settings = focusSettings()
+        settings.idleThresholdSeconds = idleThresholdSeconds
+        settings.sessionMinimumDurationSeconds = sessionMinimumDurationSeconds
+        settings.driftWindowMinutes = driftWindowMinutes
+        settings.baselineSwitchesPerHour = baselineSwitchesPerHour
+        settings.productiveSessionMinimumMinutes = productiveSessionMinimumMinutes
+
+        do {
+            try context.save()
+            _ = refreshTodayAnalysis()
+        } catch {
+            logger.error("Failed to save focus settings: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func replaceCategories(with seeds: [AppCategorySeed]) {
@@ -311,5 +355,14 @@ final class LifeReplayStore {
         }
         try context.save()
         logger.info("Seeded \(DefaultAppCategories.all.count) default app categories")
+    }
+
+    private func seedFocusSettingsIfNeeded() throws {
+        var descriptor = FetchDescriptor<FocusSettings>()
+        descriptor.fetchLimit = 1
+        guard try context.fetch(descriptor).isEmpty else { return }
+        context.insert(FocusSettings())
+        try context.save()
+        logger.info("Seeded default focus settings")
     }
 }

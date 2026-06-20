@@ -12,6 +12,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var store: LifeReplayStore?
     private var dashboard: DashboardWindowController?
     private var categoryEditor: CategoryEditorWindowController?
+    private var focusSettingsWindow: FocusSettingsWindowController?
     private var eventCount = 0
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private lazy var collector = MacActivityCollector { [weak self] event in
@@ -68,6 +69,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Edit Categories", action: #selector(openCategoryEditor), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "Focus Drift Settings", action: #selector(openFocusSettings), keyEquivalent: "s"))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
@@ -126,6 +128,16 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         categoryEditor?.reload()
         categoryEditor?.showWindow(nil)
+        NSApp.activate()
+    }
+
+    @objc private func openFocusSettings() {
+        guard let store else { return }
+        if focusSettingsWindow == nil {
+            focusSettingsWindow = FocusSettingsWindowController(store: store)
+        }
+        focusSettingsWindow?.reload()
+        focusSettingsWindow?.showWindow(nil)
         NSApp.activate()
     }
 

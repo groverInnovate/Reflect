@@ -25,6 +25,7 @@
   - [x] Synthetic XCTest coverage added
   - [x] Live Mac event stream wired into persistence
   - [x] Drift notifications implemented for bundled app runs
+  - [x] User-tunable drift thresholds implemented
   - [ ] Drift notifications verified from bundled app/Xcode run
 - [ ] Phase 3 - Daily Replay generation + Mac dashboard UI
   - [x] Initial timeline clustering implemented in `LifeReplayCore`
@@ -72,3 +73,5 @@
 - When Notifications are denied, the menu now opens macOS Notification Settings instead of attempting a re-prompt that macOS will not show.
 - Added optional Foundation Models daily replay narratives with deterministic fallback on unsupported devices/OS versions.
 - `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added `FocusSettings` persistence and a Focus Drift Settings window for threshold tuning.
+- `swift test` passes with 8 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

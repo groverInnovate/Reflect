@@ -167,6 +167,39 @@ public final class DailyReplay {
     }
 }
 
+@Model
+public final class FocusSettings {
+    public var idleThresholdSeconds: Double
+    public var sessionMinimumDurationSeconds: Double
+    public var driftWindowMinutes: Double
+    public var baselineSwitchesPerHour: Double
+    public var productiveSessionMinimumMinutes: Double
+
+    public init(
+        idleThresholdSeconds: Double = 90,
+        sessionMinimumDurationSeconds: Double = 90,
+        driftWindowMinutes: Double = 10,
+        baselineSwitchesPerHour: Double = 12,
+        productiveSessionMinimumMinutes: Double = 5
+    ) {
+        self.idleThresholdSeconds = idleThresholdSeconds
+        self.sessionMinimumDurationSeconds = sessionMinimumDurationSeconds
+        self.driftWindowMinutes = driftWindowMinutes
+        self.baselineSwitchesPerHour = baselineSwitchesPerHour
+        self.productiveSessionMinimumMinutes = productiveSessionMinimumMinutes
+    }
+
+    public var focusEngineConfiguration: FocusEngineConfiguration {
+        FocusEngineConfiguration(
+            idleThresholdSeconds: idleThresholdSeconds,
+            sessionMinimumDuration: sessionMinimumDurationSeconds,
+            driftWindow: driftWindowMinutes * 60,
+            defaultBaselineSwitchesPerHour: baselineSwitchesPerHour,
+            productiveSessionMinimumDuration: productiveSessionMinimumMinutes * 60
+        )
+    }
+}
+
 public struct TimelineBlock: Codable, Equatable, Sendable {
     public var start: Date
     public var end: Date

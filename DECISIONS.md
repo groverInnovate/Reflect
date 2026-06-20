@@ -55,3 +55,7 @@ The script-built app was ad-hoc signed with a generated hash identifier, so macO
 ## 2026-06-20 - Foundation Models as optional narrative layer
 
 Added Foundation Models summarization only behind `macOS 26` availability and runtime model availability checks. If the framework, hardware, Apple Intelligence setting, or generation call is unavailable, `DailyReplay` keeps using the deterministic fallback summary.
+
+## 2026-06-20 - Persist tunable drift thresholds
+
+Added `FocusSettings` in SwiftData and a small settings window so drift thresholds can be tuned from real feedback. The alternative was to leave constants hardcoded until later, but Phase 2 acceptance depends on calibrating against Mohit's actual work patterns.
