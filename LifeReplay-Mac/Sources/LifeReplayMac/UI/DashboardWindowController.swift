@@ -5,6 +5,7 @@ import LifeReplayCore
 @MainActor
 final class DashboardWindowController: NSWindowController {
     private let store: LifeReplayStore
+    private let permissions: PermissionController
     private let textView = NSTextView()
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -13,8 +14,9 @@ final class DashboardWindowController: NSWindowController {
         return formatter
     }()
 
-    init(store: LifeReplayStore) {
+    init(store: LifeReplayStore, permissions: PermissionController) {
         self.store = store
+        self.permissions = permissions
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
@@ -80,6 +82,11 @@ final class DashboardWindowController: NSWindowController {
             "Events captured: \(events.count)",
             "Sessions: \(analysis.sessions.count)",
             "Drift events: \(analysis.driftEvents.count)",
+            "",
+            "Permissions",
+            "-----------",
+            "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval for window titles")",
+            "Automation: macOS will ask when Safari/Chrome tab domains are first read",
             "",
             summary,
             "",

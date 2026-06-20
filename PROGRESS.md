@@ -47,4 +47,6 @@
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
 - Added optional window title capture through Accessibility and showed titles in the raw event dashboard.
 - `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test after the schema change.
-- Next best step: improve the dashboard permissions/status section and then run a real Phase 1 session check with Mohit approving macOS prompts.
+- Added a permissions/status section to the dashboard.
+- `swift test` passes with 5 Swift Testing tests.
+- Next best step: run a real Phase 1 session check with Mohit approving macOS prompts, then start Phase 2 live drift notifications.

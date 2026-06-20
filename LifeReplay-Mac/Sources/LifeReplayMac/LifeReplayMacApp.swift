@@ -83,7 +83,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate {
         }
 
         if dashboard == nil {
-            dashboard = DashboardWindowController(store: store)
+            dashboard = DashboardWindowController(store: store, permissions: permissions)
         }
         dashboard?.reload()
         dashboard?.showWindow(nil)
