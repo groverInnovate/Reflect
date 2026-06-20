@@ -165,6 +165,10 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func requestNotifications() {
+        if notificationSummary == .denied {
+            permissions.openNotificationSettings()
+            return
+        }
         notifications.requestAuthorizationIfNeeded(force: true)
         updateNotificationSummary()
     }
@@ -176,7 +180,10 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showPermissionDiagnostics() {
         let alert = NSAlert()
         alert.messageText = "Life Replay Permission Diagnostics"
-        alert.informativeText = permissions.diagnosticSummary
+        alert.informativeText = """
+        \(permissions.diagnosticSummary)
+        Notifications: \(notificationSummary.rawValue)
+        """
         alert.runModal()
     }
 

@@ -35,6 +35,10 @@ final class PermissionController {
         openSettings(url: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
     }
 
+    func openNotificationSettings() {
+        openSettings(url: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")
+    }
+
     private func openSettings(url: String) {
         guard let settingsURL = URL(string: url) else { return }
         NSWorkspace.shared.open(settingsURL)
