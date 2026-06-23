@@ -75,3 +75,7 @@ Raw timeline blocks were not enough for the product promise, so replay generatio
 ## 2026-06-23 - Make the dashboard open on the journal
 
 Changed the first dashboard tab from text diagnostics to a native "Today" journal view with score, metric cards, observations, focus break points, and timeline preview. The raw text tabs stay available for debugging; the alternative was to polish the existing text output, but the product needs instant visual comprehension at day-end.
+
+## 2026-06-23 - Enrich replay labels from event context
+
+Timeline blocks now use raw window titles and browser domains to name work more specifically, such as `Coding - lean-sim` instead of just `VS Code`. The alternative was to leave labels as app names, but that makes the journal too vague to answer "what did I actually do?"

@@ -20,7 +20,7 @@ public struct ReplayEngine: Sendable {
     }
 
     public func timelineBlocks(from sessions: [FocusSession], events: [ActivityEvent], now: Date = Date()) -> [TimelineBlock] {
-        let sessionBlocks = sessionBlocks(from: sessions)
+        let sessionBlocks = sessionBlocks(from: sessions, events: events)
         let idleBlocks = idleTimelineBlocks(from: events, now: now)
         return mergeBlocks((sessionBlocks + idleBlocks).sorted { $0.start < $1.start })
     }
@@ -35,6 +35,27 @@ public struct ReplayEngine: Sendable {
                     label: session.primaryAppName ?? label(for: session.category),
                     category: session.category,
                     detail: nil
+                )
+            }
+            .sorted { $0.start < $1.start }
+    }
+
+    private func sessionBlocks(from sessions: [FocusSession], events: [ActivityEvent]) -> [TimelineBlock] {
+        sessions
+            .compactMap { session -> TimelineBlock? in
+                guard let end = session.end, end > session.start else { return nil }
+                let sessionEvents = events.filter {
+                    ($0.kind == .appActivated || $0.kind == .browserDomain)
+                        && $0.timestamp >= session.start
+                        && $0.timestamp <= end
+                }
+                let enriched = enrichedSessionText(for: session, events: sessionEvents)
+                return TimelineBlock(
+                    start: session.start,
+                    end: end,
+                    label: enriched.label,
+                    category: session.category,
+                    detail: enriched.detail
                 )
             }
             .sorted { $0.start < $1.start }
@@ -181,6 +202,160 @@ public struct ReplayEngine: Sendable {
         case .distracting:
             "Distraction"
         }
+    }
+
+    private func enrichedSessionText(for session: FocusSession, events: [ActivityEvent]) -> (label: String, detail: String?) {
+        let names = rankedNames(from: events)
+        let primaryName = names.first ?? session.primaryAppName ?? label(for: session.category)
+        let projectName = projectName(from: events)
+        let domains = rankedDomains(from: events)
+        let detailNames = Array(unique(names + domains).prefix(4))
+        let detail = detailNames.dropFirst().isEmpty ? nil : detailNames.dropFirst().joined(separator: ", ")
+
+        switch session.category {
+        case .productive:
+            if let projectName, isCodingTool(primaryName) || names.contains(where: isCodingTool) {
+                return ("Coding - \(projectName)", detail)
+            }
+            if looksStudyLike(primaryName) || events.contains(where: { looksStudyLike($0.windowTitle ?? "") }) {
+                return ("Study / research - \(primaryName)", detail)
+            }
+            if let domain = domains.first, isDocumentationDomain(domain) {
+                return ("Docs / research - \(domain)", detail)
+            }
+            return (primaryName, detail)
+        case .neutral:
+            return (primaryName, detail)
+        case .distracting:
+            return ("Distraction - \(primaryName)", detail)
+        }
+    }
+
+    private func rankedNames(from events: [ActivityEvent]) -> [String] {
+        rankedValues(events.compactMap { event in
+            if let domain = event.browserDomain, !domain.isEmpty {
+                return domain
+            }
+            if let appName = event.appName, !appName.isEmpty {
+                return appName
+            }
+            return event.appBundleID
+        })
+    }
+
+    private func rankedDomains(from events: [ActivityEvent]) -> [String] {
+        rankedValues(events.compactMap(\.browserDomain))
+    }
+
+    private func rankedValues(_ values: [String]) -> [String] {
+        var counts: [String: Int] = [:]
+        for value in values {
+            let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty else { continue }
+            counts[cleaned, default: 0] += 1
+        }
+        return counts.sorted { lhs, rhs in
+            if lhs.value == rhs.value { return lhs.key < rhs.key }
+            return lhs.value > rhs.value
+        }.map(\.key)
+    }
+
+    private func unique(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        return values.filter { value in
+            let key = value.lowercased()
+            guard !seen.contains(key) else { return false }
+            seen.insert(key)
+            return true
+        }
+    }
+
+    private func projectName(from events: [ActivityEvent]) -> String? {
+        let appNames = events.compactMap(\.appName).map { $0.lowercased() }
+        let codingContext = appNames.contains { app in
+            app.contains("code") || app.contains("xcode") || app.contains("terminal") || app.contains("iterm")
+        }
+        guard codingContext else { return nil }
+
+        for title in events.compactMap(\.windowTitle) {
+            if let project = projectName(fromWindowTitle: title) {
+                return project
+            }
+        }
+        return nil
+    }
+
+    private func projectName(fromWindowTitle title: String) -> String? {
+        let separators = [" - ", " — ", " – ", " | "]
+        for separator in separators {
+            var parts = title
+                .components(separatedBy: separator)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            while let last = parts.last, isGenericWindowToken(last) {
+                parts.removeLast()
+            }
+            guard parts.count >= 2 else { continue }
+            if let candidate = parts.last, candidate.count >= 2, !looksLikeSourceFile(candidate) {
+                return candidate
+            }
+        }
+
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !isGenericWindowToken(trimmed), trimmed.count <= 48 else {
+            return nil
+        }
+        return trimmed
+    }
+
+    private func looksLikeSourceFile(_ token: String) -> Bool {
+        let value = token.lowercased()
+        return [".swift", ".rs", ".sol", ".js", ".ts", ".tsx", ".jsx", ".py", ".md", ".toml", ".json", ".yaml", ".yml"].contains {
+            value.hasSuffix($0)
+        }
+    }
+
+    private func isGenericWindowToken(_ token: String) -> Bool {
+        let value = token.lowercased()
+        return value.contains("visual studio code")
+            || value == "code"
+            || value == "xcode"
+            || value == "terminal"
+            || value == "iterm"
+            || value == "brave browser"
+            || value == "google chrome"
+            || value == "safari"
+    }
+
+    private func isCodingTool(_ name: String) -> Bool {
+        let value = name.lowercased()
+        return value.contains("code")
+            || value.contains("xcode")
+            || value.contains("terminal")
+            || value.contains("iterm")
+            || value.contains("cargo")
+            || value.contains("rust")
+            || value.contains("foundry")
+            || value.contains("hardhat")
+            || value.contains("noir")
+    }
+
+    private func looksStudyLike(_ text: String) -> Bool {
+        let value = text.lowercased()
+        return ["obsidian", "notion", "reading", "lecture", "study", "pdf", "book", "research", "paper", "notes"].contains {
+            value.contains($0)
+        }
+    }
+
+    private func isDocumentationDomain(_ domain: String) -> Bool {
+        let value = domain.lowercased()
+        return value.contains("docs.")
+            || value.contains("developer.")
+            || value.contains("documentation")
+            || value.contains("github.com")
+            || value.contains("stackoverflow.com")
+            || value.contains("swift.org")
+            || value.contains("rust-lang.org")
     }
 
     private func minutes(for category: FocusCategory, in blocks: [TimelineBlock]) -> Int {
