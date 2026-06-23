@@ -83,3 +83,7 @@ Timeline blocks now use raw window titles and browser domains to name work more 
 ## 2026-06-23 - Add a tomorrow target to daily insights
 
 Daily insights now end with one concrete next-day target based on focus score, drift count, distraction time, and best productive block. The alternative was to keep the journal purely descriptive, but Mohit wants insights that actively improve tomorrow's productivity.
+
+## 2026-06-23 - Replace NSTabView after dashboard crash
+
+Crash reports showed `Open Dashboard` failing inside `NSTabView`'s internal segmented tab control on macOS 26. Replaced `NSTabView` with a small custom button tab bar and content container; the alternative was to keep tweaking the new journal layout while staying on the crashing AppKit path.

@@ -7,6 +7,7 @@ APP_DIR="$ROOT_DIR/.build/LifeReplayMac.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 
+rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR"
 cp "$BIN_DIR/LifeReplayMac" "$MACOS_DIR/LifeReplayMac"
 chmod +x "$MACOS_DIR/LifeReplayMac"
@@ -44,6 +45,9 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
+
+xattr -cr "$APP_DIR"
 codesign --force --deep --sign - --identifier com.mohitgrover.LifeReplayMac "$APP_DIR" >/dev/null
 
 echo "$APP_DIR"

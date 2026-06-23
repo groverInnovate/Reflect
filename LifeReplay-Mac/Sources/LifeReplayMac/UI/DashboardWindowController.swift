@@ -4,11 +4,41 @@ import LifeReplayCore
 
 @MainActor
 final class DashboardWindowController: NSWindowController {
+    private enum DashboardTab: Int, CaseIterable {
+        case today
+        case summary
+        case insights
+        case timeline
+        case driftEvents
+        case rawEvents
+
+        var title: String {
+            switch self {
+            case .today:
+                "Today"
+            case .summary:
+                "Summary"
+            case .insights:
+                "Insights"
+            case .timeline:
+                "Timeline"
+            case .driftEvents:
+                "Drift Events"
+            case .rawEvents:
+                "Raw Events"
+            }
+        }
+    }
+
     private let store: LifeReplayStore
     private let permissions: PermissionController
     private let notifications: DriftNotificationController
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private var isGeneratingReplay = false
+    private var selectedTab: DashboardTab = .today
+    private let tabButtonStack = NSStackView()
+    private let contentContainer = NSView()
+    private let journalScrollView = NSScrollView()
     private let journalStackView = NSStackView()
     private let summaryTextView = NSTextView()
     private let insightsTextView = NSTextView()
@@ -67,33 +97,65 @@ final class DashboardWindowController: NSWindowController {
     private func configureContent() {
         guard let contentView = window?.contentView else { return }
 
-        let tabView = NSTabView()
-        tabView.translatesAutoresizingMaskIntoConstraints = false
-        tabView.addTabViewItem(journalTab())
-        tabView.addTabViewItem(tab(title: "Summary", textView: summaryTextView))
-        tabView.addTabViewItem(tab(title: "Insights", textView: insightsTextView))
-        tabView.addTabViewItem(tab(title: "Timeline", textView: timelineTextView))
-        tabView.addTabViewItem(tab(title: "Drift Events", textView: driftTextView))
-        tabView.addTabViewItem(tab(title: "Raw Events", textView: rawTextView))
+        let rootStack = NSStackView()
+        rootStack.orientation = .vertical
+        rootStack.alignment = .leading
+        rootStack.spacing = 10
+        rootStack.translatesAutoresizingMaskIntoConstraints = false
 
-        contentView.addSubview(tabView)
+        configureTabButtons()
+        configureContentViews()
+
+        contentContainer.translatesAutoresizingMaskIntoConstraints = false
+        rootStack.addArrangedSubview(tabButtonStack)
+        rootStack.addArrangedSubview(contentContainer)
+
+        contentView.addSubview(rootStack)
         NSLayoutConstraint.activate([
-            tabView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            rootStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            rootStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            rootStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+            rootStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            tabButtonStack.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            contentContainer.widthAnchor.constraint(equalTo: rootStack.widthAnchor),
+            contentContainer.heightAnchor.constraint(equalTo: rootStack.heightAnchor, constant: -42),
         ])
+
+        showSelectedTab()
     }
 
-    private func journalTab() -> NSTabViewItem {
-        let item = NSTabViewItem()
-        item.label = "Today"
+    private func configureTabButtons() {
+        tabButtonStack.orientation = .horizontal
+        tabButtonStack.alignment = .centerY
+        tabButtonStack.distribution = .fill
+        tabButtonStack.spacing = 8
+        tabButtonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = .windowBackgroundColor
+        for tab in DashboardTab.allCases {
+            let button = NSButton(title: tab.title, target: self, action: #selector(selectDashboardTab))
+            button.bezelStyle = .rounded
+            button.setButtonType(.toggle)
+            button.tag = tab.rawValue
+            button.state = tab == selectedTab ? .on : .off
+            tabButtonStack.addArrangedSubview(button)
+        }
+        tabButtonStack.addArrangedSubview(NSView())
+    }
+
+    private func configureContentViews() {
+        configureJournalScrollView()
+        configureTextView(summaryTextView)
+        configureTextView(insightsTextView)
+        configureTextView(timelineTextView)
+        configureTextView(driftTextView)
+        configureTextView(rawTextView)
+    }
+
+    private func configureJournalScrollView() {
+        journalScrollView.hasVerticalScroller = true
+        journalScrollView.borderType = .noBorder
+        journalScrollView.drawsBackground = true
+        journalScrollView.backgroundColor = .windowBackgroundColor
 
         journalStackView.orientation = .vertical
         journalStackView.alignment = .leading
@@ -104,37 +166,74 @@ final class DashboardWindowController: NSWindowController {
         wrapper.translatesAutoresizingMaskIntoConstraints = false
         journalStackView.translatesAutoresizingMaskIntoConstraints = false
         wrapper.addSubview(journalStackView)
-        scrollView.documentView = wrapper
+        journalScrollView.documentView = wrapper
 
         NSLayoutConstraint.activate([
-            wrapper.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+            wrapper.widthAnchor.constraint(equalTo: journalScrollView.contentView.widthAnchor),
             journalStackView.leadingAnchor.constraint(equalTo: wrapper.leadingAnchor),
             journalStackView.trailingAnchor.constraint(equalTo: wrapper.trailingAnchor),
             journalStackView.topAnchor.constraint(equalTo: wrapper.topAnchor),
             journalStackView.bottomAnchor.constraint(equalTo: wrapper.bottomAnchor),
         ])
-
-        item.view = scrollView
-        return item
     }
 
-    private func tab(title: String, textView: NSTextView) -> NSTabViewItem {
-        let item = NSTabViewItem()
-        item.label = title
-
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .noBorder
-
+    private func configureTextView(_ textView: NSTextView) {
         textView.isEditable = false
         textView.isSelectable = true
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textContainerInset = NSSize(width: 18, height: 18)
         textView.backgroundColor = .textBackgroundColor
-        scrollView.documentView = textView
+    }
 
-        item.view = scrollView
-        return item
+    @objc private func selectDashboardTab(_ sender: NSButton) {
+        guard let tab = DashboardTab(rawValue: sender.tag) else { return }
+        selectedTab = tab
+        showSelectedTab()
+    }
+
+    private func showSelectedTab() {
+        for case let button as NSButton in tabButtonStack.arrangedSubviews {
+            button.state = button.tag == selectedTab.rawValue ? .on : .off
+        }
+
+        for view in contentContainer.subviews {
+            view.removeFromSuperview()
+        }
+
+        let selectedView = contentView(for: selectedTab)
+        selectedView.translatesAutoresizingMaskIntoConstraints = false
+        contentContainer.addSubview(selectedView)
+        NSLayoutConstraint.activate([
+            selectedView.leadingAnchor.constraint(equalTo: contentContainer.leadingAnchor),
+            selectedView.trailingAnchor.constraint(equalTo: contentContainer.trailingAnchor),
+            selectedView.topAnchor.constraint(equalTo: contentContainer.topAnchor),
+            selectedView.bottomAnchor.constraint(equalTo: contentContainer.bottomAnchor),
+        ])
+    }
+
+    private func contentView(for tab: DashboardTab) -> NSView {
+        switch tab {
+        case .today:
+            journalScrollView
+        case .summary:
+            scrollView(for: summaryTextView)
+        case .insights:
+            scrollView(for: insightsTextView)
+        case .timeline:
+            scrollView(for: timelineTextView)
+        case .driftEvents:
+            scrollView(for: driftTextView)
+        case .rawEvents:
+            scrollView(for: rawTextView)
+        }
+    }
+
+    private func scrollView(for textView: NSTextView) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .noBorder
+        scrollView.documentView = textView
+        return scrollView
     }
 
     private func dashboardData() -> DashboardData {

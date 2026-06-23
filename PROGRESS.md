@@ -106,3 +106,6 @@
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Daily insights now include a Tomorrow Target in the dashboard, text insight tab, and Markdown export.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Fixed an `Open Dashboard` crash by replacing `NSTabView` with a custom tab button row and content container.
+- Updated the bundle script to recreate the `.app`, add `PkgInfo`, and clear extended attributes before signing.
+- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
