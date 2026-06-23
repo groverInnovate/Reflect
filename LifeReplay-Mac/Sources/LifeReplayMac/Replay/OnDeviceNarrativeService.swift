@@ -82,7 +82,7 @@ struct OnDeviceNarrativeService {
         }.joined(separator: "\n")
 
         return """
-        Summarize this day in one concise paragraph. Be specific and descriptive, not motivational.
+        Summarize this day in one concise productivity-journal paragraph. Include what happened, focus quality, productive/study time, wasted/distraction time, and the main lesson. Be specific and descriptive, not motivational.
 
         Focus score: \(focusScore)/100
 

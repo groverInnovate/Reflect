@@ -7,6 +7,7 @@ private struct ReplaySnapshot {
     var analysis: FocusAnalysis
     var blocks: [TimelineBlock]
     var fallbackSummary: String
+    var insights: DailyInsightReport
 }
 
 struct DataStatus {
@@ -136,7 +137,12 @@ final class LifeReplayStore {
             driftEvents: analysis.driftEvents,
             focusScore: analysis.focusScore
         )
-        return ReplaySnapshot(analysis: analysis, blocks: blocks, fallbackSummary: fallbackSummary)
+        let insights = replayEngine.insightReport(
+            blocks: blocks,
+            driftEvents: analysis.driftEvents,
+            focusScore: analysis.focusScore
+        )
+        return ReplaySnapshot(analysis: analysis, blocks: blocks, fallbackSummary: fallbackSummary, insights: insights)
     }
 
     private func generateDailyReplaySnapshot(
@@ -157,7 +163,7 @@ final class LifeReplayStore {
             )
             replay.timelineBlocksJSON = json
             replay.focusScore = snapshot.analysis.focusScore
-            replay.narrativeSummary = narrative ?? snapshot.fallbackSummary
+            replay.narrativeSummary = narrative ?? snapshot.insights.journalSummary
             replay.generatedAt = Date()
             replay.usedOnDeviceAI = usedOnDeviceAI
 
@@ -295,16 +301,27 @@ final class LifeReplayStore {
     func markdownForDailyReplay(_ replay: DailyReplay) -> String {
         let replayEngine = ReplayEngine()
         let blocks = (try? replayEngine.decodeBlocks(from: replay.timelineBlocksJSON)) ?? []
+        let insights = replayEngine.insightReport(blocks: blocks, driftEvents: [], focusScore: replay.focusScore)
         var lines: [String] = [
             "# Life Replay - \(replay.date.formatted(date: .long, time: .omitted))",
             "",
             "Focus Score: \(replay.focusScore)/100",
+            "Productive: \(formatMinutes(insights.productiveMinutes))",
+            "Study-like: \(formatMinutes(insights.studyLikeMinutes))",
+            "Distracting/Wasted: \(formatMinutes(insights.distractingMinutes))",
+            "Idle/Away: \(formatMinutes(insights.idleMinutes))",
             "Generated: \(replay.generatedAt.formatted(date: .abbreviated, time: .shortened))",
             "On-device AI: \(replay.usedOnDeviceAI ? "yes" : "no")",
             "",
             "## Summary",
             "",
             replay.narrativeSummary ?? "No summary generated.",
+            "",
+            "## Observations",
+            "",
+        ]
+        lines += insights.observations.map { "- \($0)" }
+        lines += [
             "",
             "## Timeline",
             "",
@@ -554,6 +571,15 @@ final class LifeReplayStore {
             return "\"\(escaped)\""
         }
         return escaped
+    }
+
+    private func formatMinutes(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
     }
 
     private func seedDefaultCategoriesIfNeeded() throws {

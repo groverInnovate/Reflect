@@ -9,6 +9,7 @@ final class DashboardWindowController: NSWindowController {
     private let notifications: DriftNotificationController
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
     private let summaryTextView = NSTextView()
+    private let insightsTextView = NSTextView()
     private let timelineTextView = NSTextView()
     private let driftTextView = NSTextView()
     private let rawTextView = NSTextView()
@@ -54,6 +55,7 @@ final class DashboardWindowController: NSWindowController {
     private func renderCurrentData() {
         let data = dashboardData()
         summaryTextView.string = renderSummary(data)
+        insightsTextView.string = renderInsights(data.insights)
         timelineTextView.string = renderTimeline(data.blocks)
         driftTextView.string = renderDrifts(data.analysis.driftEvents)
         rawTextView.string = renderRawEvents(data.events)
@@ -65,6 +67,7 @@ final class DashboardWindowController: NSWindowController {
         let tabView = NSTabView()
         tabView.translatesAutoresizingMaskIntoConstraints = false
         tabView.addTabViewItem(tab(title: "Summary", textView: summaryTextView))
+        tabView.addTabViewItem(tab(title: "Insights", textView: insightsTextView))
         tabView.addTabViewItem(tab(title: "Timeline", textView: timelineTextView))
         tabView.addTabViewItem(tab(title: "Drift Events", textView: driftTextView))
         tabView.addTabViewItem(tab(title: "Raw Events", textView: rawTextView))
@@ -102,12 +105,12 @@ final class DashboardWindowController: NSWindowController {
         let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
         let blocks = ReplayEngine().timelineBlocks(from: analysis.sessions, events: events, now: Date())
         let savedReplay = store.existingDailyReplay()
-        let summary = ReplayEngine().fallbackSummary(
+        let insights = ReplayEngine().insightReport(
             blocks: blocks,
             driftEvents: analysis.driftEvents,
             focusScore: analysis.focusScore
         )
-        return DashboardData(events: events, analysis: analysis, blocks: blocks, savedReplay: savedReplay, fallbackSummary: summary)
+        return DashboardData(events: events, analysis: analysis, blocks: blocks, savedReplay: savedReplay, insights: insights)
     }
 
     private func renderSummary(_ data: DashboardData) -> String {
@@ -126,8 +129,37 @@ final class DashboardWindowController: NSWindowController {
             "Notifications: \(notificationSummary.rawValue)",
             "Automation: macOS will ask when Safari/Chrome tab domains are first read",
             "",
-            data.savedReplay?.narrativeSummary ?? data.fallbackSummary,
+            data.savedReplay?.narrativeSummary ?? data.insights.journalSummary,
         ]
+        return lines.joined(separator: "\n")
+    }
+
+    private func renderInsights(_ insights: DailyInsightReport) -> String {
+        var lines: [String] = [
+            "Time Breakdown",
+            "--------------",
+            "Productive:   \(formatMinutes(insights.productiveMinutes))",
+            "Study-like:   \(formatMinutes(insights.studyLikeMinutes))",
+            "Distracting/Wasted: \(formatMinutes(insights.distractingMinutes))",
+            "Neutral:      \(formatMinutes(insights.neutralMinutes))",
+            "Idle/Away:    \(formatMinutes(insights.idleMinutes))",
+            "Tracked:      \(formatMinutes(insights.totalTrackedMinutes))",
+            "",
+            "Focus",
+            "-----",
+            "Score: \(insights.focusScore)/100",
+            "Drift events: \(insights.driftCount)",
+            "Best block: \(insights.longestProductiveBlockLabel ?? "none")\(insights.longestProductiveBlockMinutes.map { " (\(formatMinutes($0)))" } ?? "")",
+            "Top distractions: \(insights.topDistractions.isEmpty ? "none detected" : insights.topDistractions.joined(separator: ", "))",
+            "",
+            "Journal",
+            "-------",
+            insights.journalSummary,
+            "",
+            "Observations",
+            "------------",
+        ]
+        lines += insights.observations.map { "- \($0)" }
         return lines.joined(separator: "\n")
     }
 
@@ -172,6 +204,15 @@ final class DashboardWindowController: NSWindowController {
         let title = event.windowTitle.map { "  -  \($0)" } ?? ""
         return "\(time)  \(event.kind.rawValue)  \(name)\(title)"
     }
+
+    private func formatMinutes(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+        let hours = minutes / 60
+        let remainder = minutes % 60
+        return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
+    }
 }
 
 private struct DashboardData {
@@ -179,5 +220,5 @@ private struct DashboardData {
     var analysis: FocusAnalysis
     var blocks: [TimelineBlock]
     var savedReplay: DailyReplay?
-    var fallbackSummary: String
+    var insights: DailyInsightReport
 }

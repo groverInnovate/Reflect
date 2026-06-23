@@ -70,4 +70,53 @@ struct ReplayEngineTests {
 
         #expect(blocks.contains { $0.label == "Idle period" && $0.start == start.addingTimeInterval(900) })
     }
+
+    @Test("insight report turns timeline blocks into journal metrics")
+    func insightReportBuildsJournalMetrics() {
+        let start = Date(timeIntervalSince1970: 0)
+        let blocks = [
+            TimelineBlock(
+                start: start,
+                end: start.addingTimeInterval(3_600),
+                label: "Research reading",
+                category: .productive,
+                detail: "PDF notes"
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(3_900),
+                end: start.addingTimeInterval(4_800),
+                label: "Twitter",
+                category: .distracting
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(5_100),
+                end: start.addingTimeInterval(6_000),
+                label: "Idle period",
+                category: .neutral,
+                detail: "No keyboard or mouse input"
+            ),
+        ]
+        let drifts = [
+            DriftEvent(
+                timestamp: start.addingTimeInterval(4_000),
+                triggerAppNames: ["Twitter"],
+                switchCountInWindow: 8,
+                baselineSwitchRate: 12,
+                severity: 0.7
+            ),
+        ]
+
+        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: drifts, focusScore: 74)
+
+        #expect(report.productiveMinutes == 60)
+        #expect(report.studyLikeMinutes == 60)
+        #expect(report.distractingMinutes == 15)
+        #expect(report.idleMinutes == 15)
+        #expect(report.neutralMinutes == 0)
+        #expect(report.driftCount == 1)
+        #expect(report.longestProductiveBlockLabel == "Research reading")
+        #expect(report.topDistractions.first == "Twitter")
+        #expect(report.journalSummary.contains("productive"))
+        #expect(report.journalSummary.contains("Distracting/wasted"))
+    }
 }

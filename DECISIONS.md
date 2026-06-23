@@ -67,3 +67,7 @@ Idle start/end events now generate neutral "Idle period" timeline blocks. This m
 ## 2026-06-20 - Subtract idle overlap from focus sessions
 
 The focus engine now computes idle overlap per session before scoring. Without this, a long VS Code session could incorrectly count as productive time while Mohit was away from the keyboard.
+
+## 2026-06-23 - Add an explicit daily insight report
+
+Raw timeline blocks were not enough for the product promise, so replay generation now produces a journal-oriented `DailyInsightReport` with productive time, study-like time, distracting/wasted time, idle time, top pulls, and plain observations. The alternative was to keep improving the timeline display, but Mohit needs interpreted end-of-day insight, not just telemetry.
