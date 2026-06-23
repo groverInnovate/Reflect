@@ -87,3 +87,7 @@ Daily insights now end with one concrete next-day target based on focus score, d
 ## 2026-06-23 - Replace NSTabView after dashboard crash
 
 Crash reports showed `Open Dashboard` failing inside `NSTabView`'s internal segmented tab control on macOS 26. Replaced `NSTabView` with a small custom button tab bar and content container; the alternative was to keep tweaking the new journal layout while staying on the crashing AppKit path.
+
+## 2026-06-23 - Avoid SwiftData #Predicate in dashboard fetches
+
+The next dashboard crash report showed a fault inside SwiftData's generated `#Predicate` code while fetching today's events. Replaced store predicates with sorted fetches plus in-memory date filtering; the alternative was to keep relying on SwiftData predicate codegen for tiny local datasets, which is not worth the crash risk.

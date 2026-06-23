@@ -109,3 +109,5 @@
 - Fixed an `Open Dashboard` crash by replacing `NSTabView` with a custom tab button row and content container.
 - Updated the bundle script to recreate the `.app`, add `PkgInfo`, and clear extended attributes before signing.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Fixed the follow-up dashboard crash by removing SwiftData `#Predicate` fetches from the store and filtering day ranges in Swift.
+- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

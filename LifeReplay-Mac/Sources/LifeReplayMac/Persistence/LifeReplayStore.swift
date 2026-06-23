@@ -182,17 +182,13 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
-        let predicate = #Predicate<ActivityEvent> { event in
-            event.timestamp >= start && event.timestamp < end
-        }
         var descriptor = FetchDescriptor<ActivityEvent>(
-            predicate: predicate,
             sortBy: [SortDescriptor(\ActivityEvent.timestamp, order: .forward)]
         )
-        descriptor.fetchLimit = 2_000
+        descriptor.fetchLimit = 10_000
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).filter { $0.timestamp >= start && $0.timestamp < end }
         } catch {
             logger.error("Failed to fetch today's activity events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -227,17 +223,13 @@ final class LifeReplayStore {
     func existingDailyReplay(for date: Date = Date()) -> DailyReplay? {
         let day = Calendar.current.startOfDay(for: date)
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
-        let predicate = #Predicate<DailyReplay> { replay in
-            replay.date >= day && replay.date < nextDay
-        }
         var descriptor = FetchDescriptor<DailyReplay>(
-            predicate: predicate,
             sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 1
+        descriptor.fetchLimit = 200
 
         do {
-            return try context.fetch(descriptor).first
+            return try context.fetch(descriptor).first { $0.date >= day && $0.date < nextDay }
         } catch {
             logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -261,17 +253,13 @@ final class LifeReplayStore {
     func weeklyRollup(now: Date = Date()) -> WeeklyRollup {
         let calendar = Calendar.current
         let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
-        let predicate = #Predicate<DailyReplay> { replay in
-            replay.date >= start && replay.date <= now
-        }
         let descriptor = FetchDescriptor<DailyReplay>(
-            predicate: predicate,
             sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
         )
 
         let replays: [DailyReplay]
         do {
-            replays = try context.fetch(descriptor)
+            replays = try context.fetch(descriptor).filter { $0.date >= start && $0.date <= now }
         } catch {
             logger.error("Failed to fetch weekly rollup: \(error.localizedDescription, privacy: .public)")
             replays = []
@@ -470,16 +458,12 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
-        let predicate = #Predicate<DriftEvent> { event in
-            event.timestamp >= start && event.timestamp < end
-        }
         let descriptor = FetchDescriptor<DriftEvent>(
-            predicate: predicate,
             sortBy: [SortDescriptor(\DriftEvent.timestamp, order: .forward)]
         )
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).filter { $0.timestamp >= start && $0.timestamp < end }
         } catch {
             logger.error("Failed to fetch today's drift events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -490,13 +474,12 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
-        let predicate = #Predicate<FocusSession> { session in
-            session.start >= start && session.start < end
-        }
-        let descriptor = FetchDescriptor<FocusSession>(predicate: predicate)
+        let descriptor = FetchDescriptor<FocusSession>(
+            sortBy: [SortDescriptor(\FocusSession.start, order: .forward)]
+        )
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).filter { $0.start >= start && $0.start < end }
         } catch {
             logger.error("Failed to fetch today's focus sessions: \(error.localizedDescription, privacy: .public)")
             return []
