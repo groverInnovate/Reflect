@@ -8,6 +8,7 @@ final class DashboardWindowController: NSWindowController {
     private let permissions: PermissionController
     private let notifications: DriftNotificationController
     private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
+    private var isGeneratingReplay = false
     private let journalStackView = NSStackView()
     private let summaryTextView = NSTextView()
     private let insightsTextView = NSTextView()
@@ -175,18 +176,33 @@ final class DashboardWindowController: NSWindowController {
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
 
+        let titleRow = NSStackView()
+        titleRow.orientation = .horizontal
+        titleRow.alignment = .centerY
+        titleRow.distribution = .fill
+        titleRow.spacing = 12
+        titleRow.translatesAutoresizingMaskIntoConstraints = false
+
         let title = label(
             "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             font: .systemFont(ofSize: 30, weight: .bold),
             color: .labelColor
         )
+        let generateButton = NSButton(title: isGeneratingReplay ? "Generating..." : "Generate Today's Journal", target: self, action: #selector(generateTodayJournal))
+        generateButton.bezelStyle = .rounded
+        generateButton.isEnabled = !isGeneratingReplay
+        generateButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
         let subtitle = label(
             "\(focusScoreTone(data.insights.focusScore))  \(data.events.count) raw events captured, \(data.analysis.sessions.count) focus sessions, \(data.analysis.driftEvents.count) drift events.",
             font: .systemFont(ofSize: 14, weight: .regular),
             color: .secondaryLabelColor
         )
 
-        stack.addArrangedSubview(title)
+        titleRow.addArrangedSubview(title)
+        titleRow.addArrangedSubview(generateButton)
+        titleRow.widthAnchor.constraint(equalTo: journalStackView.widthAnchor).isActive = true
+        stack.addArrangedSubview(titleRow)
         stack.addArrangedSubview(subtitle)
         return stack
     }
@@ -422,6 +438,18 @@ final class DashboardWindowController: NSWindowController {
         let name = event.browserDomain ?? event.appName ?? event.appBundleID ?? "-"
         let title = event.windowTitle.map { "  -  \($0)" } ?? ""
         return "\(time)  \(event.kind.rawValue)  \(name)\(title)"
+    }
+
+    @objc private func generateTodayJournal() {
+        guard !isGeneratingReplay else { return }
+        isGeneratingReplay = true
+        renderCurrentData()
+
+        Task { @MainActor in
+            _ = await store.generateDailyReplayWithNarrative()
+            isGeneratingReplay = false
+            renderCurrentData()
+        }
     }
 
     private func plainSectionBox() -> NSView {
