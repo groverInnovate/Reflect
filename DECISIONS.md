@@ -95,3 +95,7 @@ The next dashboard crash report showed a fault inside SwiftData's generated `#Pr
 ## 2026-06-23 - Avoid closure filtering over SwiftData models
 
 The 21:55 crash report moved from `#Predicate` into the Swift `filter` closure over fetched `ActivityEvent` models. Replaced store-side higher-order filtering/selection over SwiftData models with explicit loops to avoid Swift executor/runtime crashes on this macOS build.
+
+## 2026-06-23 - Detach dashboard events from SwiftData
+
+The next crash report showed the same executor failure inside `categorySeeds()` while mapping SwiftData-backed `AppCategory` objects. Dashboard event fetches now copy `ActivityEvent` rows into detached objects, category seed creation uses explicit loops, and dashboard rendering avoids closures over live model objects. The alternative was to keep patching individual stack frames, but the safer product path is to keep SwiftData models out of dashboard analysis/render closures.

@@ -113,3 +113,5 @@
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Fixed the 21:55 dashboard crash by replacing store-side SwiftData model `filter`/`first` convenience closures with explicit loops.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Hardened dashboard data loading further by detaching fetched `ActivityEvent` rows and avoiding model-object closures in category seed and dashboard rendering paths.
+- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

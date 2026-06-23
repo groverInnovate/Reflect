@@ -419,7 +419,13 @@ final class DashboardWindowController: NSWindowController {
         let stack = sectionStack()
         stack.addArrangedSubview(label("Timeline Preview", font: .systemFont(ofSize: 18, weight: .semibold), color: .labelColor))
 
-        let visibleBlocks = blocks.filter { Int($0.end.timeIntervalSince($0.start) / 60) >= 3 }.prefix(8)
+        var visibleBlocks: [TimelineBlock] = []
+        for block in blocks {
+            guard visibleBlocks.count < 8 else { break }
+            if Int(block.end.timeIntervalSince(block.start) / 60) >= 3 {
+                visibleBlocks.append(block)
+            }
+        }
         if visibleBlocks.isEmpty {
             stack.addArrangedSubview(label("No timeline blocks yet. Leave collection running and switch through a few real apps.", font: .systemFont(ofSize: 14), color: .secondaryLabelColor))
         } else {
@@ -433,14 +439,23 @@ final class DashboardWindowController: NSWindowController {
     }
 
     private func permissionFooterView(_ data: DashboardData) -> NSView {
-        let savedReplayText = data.savedReplay.map {
-            "Saved replay generated \($0.generatedAt.formatted(date: .omitted, time: .shortened))."
-        } ?? "Today has not been saved as a replay yet."
+        let savedReplayText: String
+        if let replay = data.savedReplay {
+            savedReplayText = "Saved replay generated \(replay.generatedAt.formatted(date: .omitted, time: .shortened))."
+        } else {
+            savedReplayText = "Today has not been saved as a replay yet."
+        }
         let permissionsText = "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval") | Notifications: \(notificationSummary.rawValue)"
         return sectionView(title: "Status", body: "\(savedReplayText)\n\(permissionsText)")
     }
 
     private func renderSummary(_ data: DashboardData) -> String {
+        let savedReplayText: String
+        if let replay = data.savedReplay {
+            savedReplayText = "Generated \(replay.generatedAt.formatted(date: .omitted, time: .shortened))"
+        } else {
+            savedReplayText = "Not generated yet"
+        }
         let lines: [String] = [
             "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             "",
@@ -448,7 +463,7 @@ final class DashboardWindowController: NSWindowController {
             "Events captured: \(data.events.count)",
             "Sessions: \(data.analysis.sessions.count)",
             "Drift events: \(data.analysis.driftEvents.count)",
-            "Saved replay: \(data.savedReplay.map { "Generated \($0.generatedAt.formatted(date: .omitted, time: .shortened))" } ?? "Not generated yet")",
+            "Saved replay: \(savedReplayText)",
             "",
             "Permissions",
             "-----------",
@@ -514,7 +529,12 @@ final class DashboardWindowController: NSWindowController {
         if events.isEmpty {
             return "No raw events captured today."
         }
-        return events.suffix(250).map(renderEvent).joined(separator: "\n")
+        let startIndex = max(0, events.count - 250)
+        var lines: [String] = []
+        for index in startIndex..<events.count {
+            lines.append(renderEvent(events[index]))
+        }
+        return lines.joined(separator: "\n")
     }
 
     private func renderBlock(_ block: TimelineBlock) -> String {

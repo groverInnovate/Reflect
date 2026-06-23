@@ -82,10 +82,18 @@ final class LifeReplayStore {
     }
 
     func refreshTodayAnalysis(now: Date = Date()) -> (analysis: FocusAnalysis, newDrifts: [DriftEvent]) {
-        let existingDriftKeys = Set(driftEventsForToday(now: now).map(driftKey))
+        var existingDriftKeys: Set<String> = []
+        for drift in driftEventsForToday(now: now) {
+            existingDriftKeys.insert(driftKey(drift))
+        }
         let events = eventsForToday(now: now)
         let analysis = makeFocusEngine().analyze(events: events, now: now)
-        let newDrifts = analysis.driftEvents.filter { !existingDriftKeys.contains(driftKey($0)) }
+        var newDrifts: [DriftEvent] = []
+        for drift in analysis.driftEvents {
+            if !existingDriftKeys.contains(driftKey(drift)) {
+                newDrifts.append(drift)
+            }
+        }
 
         replaceTodaySessionsAndDrifts(with: analysis, now: now)
         return (analysis, newDrifts)
@@ -192,7 +200,7 @@ final class LifeReplayStore {
             for event in try context.fetch(descriptor) {
                 let timestamp = event.timestamp
                 if timestamp >= start && timestamp < end {
-                    events.append(event)
+                    events.append(detachedActivityEvent(from: event))
                 }
             }
             return events
@@ -380,16 +388,18 @@ final class LifeReplayStore {
 
     func exportConfiguration(to url: URL) throws {
         let settings = focusSettings()
+        var categoryExports: [CategoryExport] = []
+        for category in categories() {
+            categoryExports.append(CategoryExport(
+                matchPattern: category.matchPattern,
+                displayName: category.displayName,
+                category: category.category.rawValue,
+                isUserEdited: category.isUserEdited
+            ))
+        }
         let export = ConfigurationExport(
             exportedAt: Date(),
-            categories: categories().map {
-                CategoryExport(
-                    matchPattern: $0.matchPattern,
-                    displayName: $0.displayName,
-                    category: $0.category.rawValue,
-                    isUserEdited: $0.isUserEdited
-                )
-            },
+            categories: categoryExports,
             focusSettings: FocusSettingsExport(
                 idleThresholdSeconds: settings.idleThresholdSeconds,
                 sessionMinimumDurationSeconds: settings.sessionMinimumDurationSeconds,
@@ -407,9 +417,11 @@ final class LifeReplayStore {
     }
 
     func categorySeeds() -> [AppCategorySeed] {
-        categories().map {
-            AppCategorySeed($0.matchPattern, $0.displayName, $0.category)
+        var seeds: [AppCategorySeed] = []
+        for category in categories() {
+            seeds.append(AppCategorySeed(category.matchPattern, category.displayName, category.category))
         }
+        return seeds
     }
 
     func makeFocusEngine() -> FocusEngine {
@@ -561,32 +573,46 @@ final class LifeReplayStore {
         return "\(Int(event.timestamp.timeIntervalSince1970))-\(event.switchCountInWindow)-\(triggerKey)"
     }
 
+    private func detachedActivityEvent(from event: ActivityEvent) -> ActivityEvent {
+        ActivityEvent(
+            timestamp: event.timestamp,
+            kind: ActivityKind(rawValue: event.kindRawValue) ?? .appActivated,
+            appBundleID: event.appBundleID,
+            appName: event.appName,
+            windowTitle: event.windowTitle,
+            browserDomain: event.browserDomain,
+            source: event.source
+        )
+    }
+
     private func csvForActivityEvents(_ events: [ActivityEvent]) -> String {
         var rows = ["timestamp,kind,appBundleID,appName,windowTitle,browserDomain,source"]
-        rows += events.map {
-            [
-                $0.timestamp.ISO8601Format(),
-                $0.kind.rawValue,
-                $0.appBundleID ?? "",
-                $0.appName ?? "",
-                $0.windowTitle ?? "",
-                $0.browserDomain ?? "",
-                $0.source,
-            ].map(csvEscape).joined(separator: ",")
+        for event in events {
+            let values = [
+                event.timestamp.ISO8601Format(),
+                event.kind.rawValue,
+                event.appBundleID ?? "",
+                event.appName ?? "",
+                event.windowTitle ?? "",
+                event.browserDomain ?? "",
+                event.source,
+            ]
+            rows.append(values.map(csvEscape).joined(separator: ","))
         }
         return rows.joined(separator: "\n") + "\n"
     }
 
     private func csvForDriftEvents(_ drifts: [DriftEvent]) -> String {
         var rows = ["timestamp,triggerAppNames,switchCountInWindow,baselineSwitchRate,severity"]
-        rows += drifts.map {
-            [
-                $0.timestamp.ISO8601Format(),
-                $0.triggerAppNames.joined(separator: "; "),
-                String($0.switchCountInWindow),
-                String($0.baselineSwitchRate),
-                String($0.severity),
-            ].map(csvEscape).joined(separator: ",")
+        for drift in drifts {
+            let values = [
+                drift.timestamp.ISO8601Format(),
+                drift.triggerAppNames.joined(separator: "; "),
+                String(drift.switchCountInWindow),
+                String(drift.baselineSwitchRate),
+                String(drift.severity),
+            ]
+            rows.append(values.map(csvEscape).joined(separator: ","))
         }
         return rows.joined(separator: "\n") + "\n"
     }
