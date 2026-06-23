@@ -91,3 +91,7 @@ Crash reports showed `Open Dashboard` failing inside `NSTabView`'s internal segm
 ## 2026-06-23 - Avoid SwiftData #Predicate in dashboard fetches
 
 The next dashboard crash report showed a fault inside SwiftData's generated `#Predicate` code while fetching today's events. Replaced store predicates with sorted fetches plus in-memory date filtering; the alternative was to keep relying on SwiftData predicate codegen for tiny local datasets, which is not worth the crash risk.
+
+## 2026-06-23 - Avoid closure filtering over SwiftData models
+
+The 21:55 crash report moved from `#Predicate` into the Swift `filter` closure over fetched `ActivityEvent` models. Replaced store-side higher-order filtering/selection over SwiftData models with explicit loops to avoid Swift executor/runtime crashes on this macOS build.

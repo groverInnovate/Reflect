@@ -188,7 +188,14 @@ final class LifeReplayStore {
         descriptor.fetchLimit = 10_000
 
         do {
-            return try context.fetch(descriptor).filter { $0.timestamp >= start && $0.timestamp < end }
+            var events: [ActivityEvent] = []
+            for event in try context.fetch(descriptor) {
+                let timestamp = event.timestamp
+                if timestamp >= start && timestamp < end {
+                    events.append(event)
+                }
+            }
+            return events
         } catch {
             logger.error("Failed to fetch today's activity events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -229,7 +236,13 @@ final class LifeReplayStore {
         descriptor.fetchLimit = 200
 
         do {
-            return try context.fetch(descriptor).first { $0.date >= day && $0.date < nextDay }
+            for replay in try context.fetch(descriptor) {
+                let replayDate = replay.date
+                if replayDate >= day && replayDate < nextDay {
+                    return replay
+                }
+            }
+            return nil
         } catch {
             logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -257,18 +270,27 @@ final class LifeReplayStore {
             sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
         )
 
-        let replays: [DailyReplay]
+        var replays: [DailyReplay] = []
         do {
-            replays = try context.fetch(descriptor).filter { $0.date >= start && $0.date <= now }
+            for replay in try context.fetch(descriptor) {
+                let replayDate = replay.date
+                if replayDate >= start && replayDate <= now {
+                    replays.append(replay)
+                }
+            }
         } catch {
             logger.error("Failed to fetch weekly rollup: \(error.localizedDescription, privacy: .public)")
-            replays = []
         }
 
-        let average = replays.isEmpty
-            ? 0
-            : Int((Double(replays.reduce(0) { $0 + $1.focusScore }) / Double(replays.count)).rounded())
-        let best = replays.max { $0.focusScore < $1.focusScore }
+        var totalScore = 0
+        var best: DailyReplay?
+        for replay in replays {
+            totalScore += replay.focusScore
+            if best == nil || replay.focusScore > (best?.focusScore ?? 0) {
+                best = replay
+            }
+        }
+        let average = replays.isEmpty ? 0 : Int((Double(totalScore) / Double(replays.count)).rounded())
         return WeeklyRollup(days: replays.count, averageFocusScore: average, bestDay: best, latestDays: replays)
     }
 
@@ -279,7 +301,10 @@ final class LifeReplayStore {
         descriptor.fetchLimit = 1
 
         do {
-            return try context.fetch(descriptor).first
+            for replay in try context.fetch(descriptor) {
+                return replay
+            }
+            return nil
         } catch {
             logger.error("Failed to fetch latest daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -398,7 +423,7 @@ final class LifeReplayStore {
         var descriptor = FetchDescriptor<FocusSettings>()
         descriptor.fetchLimit = 1
         do {
-            if let settings = try context.fetch(descriptor).first {
+            for settings in try context.fetch(descriptor) {
                 return settings
             }
         } catch {
@@ -463,7 +488,14 @@ final class LifeReplayStore {
         )
 
         do {
-            return try context.fetch(descriptor).filter { $0.timestamp >= start && $0.timestamp < end }
+            var drifts: [DriftEvent] = []
+            for event in try context.fetch(descriptor) {
+                let timestamp = event.timestamp
+                if timestamp >= start && timestamp < end {
+                    drifts.append(event)
+                }
+            }
+            return drifts
         } catch {
             logger.error("Failed to fetch today's drift events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -479,7 +511,14 @@ final class LifeReplayStore {
         )
 
         do {
-            return try context.fetch(descriptor).filter { $0.start >= start && $0.start < end }
+            var sessions: [FocusSession] = []
+            for session in try context.fetch(descriptor) {
+                let sessionStart = session.start
+                if sessionStart >= start && sessionStart < end {
+                    sessions.append(session)
+                }
+            }
+            return sessions
         } catch {
             logger.error("Failed to fetch today's focus sessions: \(error.localizedDescription, privacy: .public)")
             return []

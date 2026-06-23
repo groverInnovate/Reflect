@@ -111,3 +111,5 @@
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Fixed the follow-up dashboard crash by removing SwiftData `#Predicate` fetches from the store and filtering day ranges in Swift.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Fixed the 21:55 dashboard crash by replacing store-side SwiftData model `filter`/`first` convenience closures with explicit loops.
+- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
