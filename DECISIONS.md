@@ -71,3 +71,7 @@ The focus engine now computes idle overlap per session before scoring. Without t
 ## 2026-06-23 - Add an explicit daily insight report
 
 Raw timeline blocks were not enough for the product promise, so replay generation now produces a journal-oriented `DailyInsightReport` with productive time, study-like time, distracting/wasted time, idle time, top pulls, and plain observations. The alternative was to keep improving the timeline display, but Mohit needs interpreted end-of-day insight, not just telemetry.
+
+## 2026-06-23 - Make the dashboard open on the journal
+
+Changed the first dashboard tab from text diagnostics to a native "Today" journal view with score, metric cards, observations, focus break points, and timeline preview. The raw text tabs stay available for debugging; the alternative was to polish the existing text output, but the product needs instant visual comprehension at day-end.

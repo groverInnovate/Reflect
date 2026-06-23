@@ -32,6 +32,7 @@
   - [x] Daily replay snapshots persisted to SwiftData
   - [x] Dashboard timeline UI implemented
   - [x] Journal-style daily insights implemented
+  - [x] Native Today journal dashboard implemented
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
   - [x] Deterministic fallback summary implemented
@@ -93,4 +94,6 @@
 - Added recent replay backfill for days with events but no saved DailyReplay.
 - Added `DailyInsightReport` with productive, study-like, distracting/wasted, idle, focus, top-distraction, and observation fields.
 - Added a Dashboard Insights tab and richer Markdown export summaries so the app reads more like an end-of-day productivity journal.
+- `swift test` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a first-position Today tab with metric cards, journal summary, observations, focus break points, timeline preview, and permission/save status.
 - `swift test` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
