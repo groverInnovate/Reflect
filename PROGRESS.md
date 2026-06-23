@@ -35,6 +35,7 @@
   - [x] Native Today journal dashboard implemented
   - [x] Timeline labels enriched from window titles and browser domains
   - [x] Dashboard can generate today's saved journal directly
+  - [x] Tomorrow Target added to daily insights
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
   - [x] Deterministic fallback summary implemented
@@ -102,4 +103,6 @@
 - Timeline generation now derives richer journal labels from raw event context, including coding project names and distracting browser domains.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added a dashboard-level "Generate Today's Journal" button so the end-of-day save action is visible in the main experience.
+- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Daily insights now include a Tomorrow Target in the dashboard, text insight tab, and Markdown export.
 - `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

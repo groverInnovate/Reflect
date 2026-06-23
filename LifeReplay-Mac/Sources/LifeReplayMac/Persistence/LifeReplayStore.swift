@@ -323,6 +323,10 @@ final class LifeReplayStore {
         lines += insights.observations.map { "- \($0)" }
         lines += [
             "",
+            "## Tomorrow Target",
+            "",
+            insights.tomorrowTarget,
+            "",
             "## Timeline",
             "",
         ]

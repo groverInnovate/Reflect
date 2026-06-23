@@ -79,3 +79,7 @@ Changed the first dashboard tab from text diagnostics to a native "Today" journa
 ## 2026-06-23 - Enrich replay labels from event context
 
 Timeline blocks now use raw window titles and browser domains to name work more specifically, such as `Coding - lean-sim` instead of just `VS Code`. The alternative was to leave labels as app names, but that makes the journal too vague to answer "what did I actually do?"
+
+## 2026-06-23 - Add a tomorrow target to daily insights
+
+Daily insights now end with one concrete next-day target based on focus score, drift count, distraction time, and best productive block. The alternative was to keep the journal purely descriptive, but Mohit wants insights that actively improve tomorrow's productivity.

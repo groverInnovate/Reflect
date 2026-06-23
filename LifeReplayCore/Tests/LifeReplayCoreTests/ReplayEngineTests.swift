@@ -118,6 +118,7 @@ struct ReplayEngineTests {
         #expect(report.topDistractions.first == "Twitter")
         #expect(report.journalSummary.contains("productive"))
         #expect(report.journalSummary.contains("Distracting/wasted"))
+        #expect(!report.tomorrowTarget.isEmpty)
     }
 
     @Test("timeline labels use window titles and domains for journal context")

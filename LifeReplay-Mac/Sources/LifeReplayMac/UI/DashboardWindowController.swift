@@ -157,6 +157,7 @@ final class DashboardWindowController: NSWindowController {
         journalStackView.addArrangedSubview(metricGrid(data.insights))
         journalStackView.addArrangedSubview(sectionView(title: "Journal", body: data.savedReplay?.narrativeSummary ?? data.insights.journalSummary))
         journalStackView.addArrangedSubview(observationsView(data.insights.observations))
+        journalStackView.addArrangedSubview(sectionView(title: "Tomorrow Target", body: data.insights.tomorrowTarget))
         journalStackView.addArrangedSubview(focusBreaksView(data.analysis.driftEvents))
         journalStackView.addArrangedSubview(timelinePreviewView(data.blocks))
         journalStackView.addArrangedSubview(permissionFooterView(data))
@@ -387,6 +388,12 @@ final class DashboardWindowController: NSWindowController {
             "------------",
         ]
         lines += insights.observations.map { "- \($0)" }
+        lines += [
+            "",
+            "Tomorrow Target",
+            "---------------",
+            insights.tomorrowTarget,
+        ]
         return lines.joined(separator: "\n")
     }
 

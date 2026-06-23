@@ -150,6 +150,14 @@ public struct ReplayEngine: Sendable {
             longestProductiveBlock: longest,
             topDistractions: topDistractions
         )
+        let tomorrowTarget = tomorrowTarget(
+            focusScore: focusScore,
+            productiveMinutes: productiveMinutes,
+            distractingMinutes: distractingMinutes,
+            driftCount: driftEvents.count,
+            longestProductiveBlock: longest,
+            topDistractions: topDistractions
+        )
 
         let summary = journalSummary(
             focusScore: focusScore,
@@ -176,6 +184,7 @@ public struct ReplayEngine: Sendable {
             worstDriftTrigger: worstDrift?.triggerAppNames.joined(separator: ", "),
             topDistractions: topDistractions,
             observations: observations,
+            tomorrowTarget: tomorrowTarget,
             journalSummary: summary
         )
     }
@@ -478,6 +487,34 @@ public struct ReplayEngine: Sendable {
         return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(distractionText)\(driftText)\(bestBlock)\(idleText) Focus score: \(focusScore)/100."
     }
 
+    private func tomorrowTarget(
+        focusScore: Int,
+        productiveMinutes: Int,
+        distractingMinutes: Int,
+        driftCount: Int,
+        longestProductiveBlock: TimelineBlock?,
+        topDistractions: [String]
+    ) -> String {
+        if productiveMinutes == 0 {
+            return "Start with one 45-minute tracked work/study block before opening communication or entertainment apps."
+        }
+
+        if distractingMinutes >= 45 || driftCount >= 2 {
+            let distraction = topDistractions.first ?? "the biggest distraction"
+            return "Protect the first deep-work block from \(distraction); open it only after one planned work/study session is complete."
+        }
+
+        if let longestProductiveBlock, minutes(in: longestProductiveBlock) < 60, productiveMinutes >= 60 {
+            return "Turn fragmented work into one uninterrupted 60-minute block before optimizing anything else."
+        }
+
+        if focusScore >= 80, let longestProductiveBlock {
+            return "Repeat the conditions around \(longestProductiveBlock.label); that was the strongest pattern in today's data."
+        }
+
+        return "Aim for one protected 90-minute productive block and check whether drift stays at zero during that window."
+    }
+
     private func formatMinutes(_ minutes: Int) -> String {
         if minutes < 60 {
             return "\(minutes)m"
@@ -502,5 +539,6 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var worstDriftTrigger: String?
     public var topDistractions: [String]
     public var observations: [String]
+    public var tomorrowTarget: String
     public var journalSummary: String
 }
