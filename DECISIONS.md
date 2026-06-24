@@ -79,3 +79,7 @@ Rolled back the native Today dashboard, enriched-label pass, tomorrow target, an
 ## 2026-06-24 - Improve insights inside stable text dashboard
 
 Kept the working text-tab dashboard and improved only the pure replay insight model plus text rendering. Added coding-like time, deep-work time, fragmented productive time, top productive threads, and a next action; the alternative was another UI rebuild, which is too risky until the stable dashboard has more real usage.
+
+## 2026-06-24 - Professionalize dashboard around daily learning
+
+Reduced the visible dashboard to Daily Review, Activity Timeline, and Focus Breaks so it teaches what happened instead of exposing debug surfaces. Added a ranked activity breakdown and explicit drift-alert status; the alternative was a redesigned native/card dashboard, but the stable AppKit text dashboard is the safer base after recent crashes.

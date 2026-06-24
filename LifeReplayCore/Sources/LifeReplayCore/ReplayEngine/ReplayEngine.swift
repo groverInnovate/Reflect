@@ -123,6 +123,7 @@ public struct ReplayEngine: Sendable {
         let deepWorkMinutes = deepWorkMinutes(in: blocks)
         let fragmentedProductiveMinutes = fragmentedProductiveMinutes(in: blocks)
         let topProductiveLabels = topLabels(for: .productive, in: blocks)
+        let topActivities = activityBreakdown(from: blocks)
         let observations = observations(
             focusScore: focusScore,
             productiveMinutes: productiveMinutes,
@@ -174,6 +175,7 @@ public struct ReplayEngine: Sendable {
             longestProductiveBlockLabel: longest?.label,
             longestProductiveBlockMinutes: longest.map(minutes(in:)),
             worstDriftTrigger: worstDrift?.triggerAppNames.joined(separator: ", "),
+            topActivities: topActivities,
             topProductiveLabels: topProductiveLabels,
             topDistractions: topDistractions,
             observations: observations,
@@ -290,6 +292,36 @@ public struct ReplayEngine: Sendable {
             }
             .prefix(3)
             .map(\.key)
+    }
+
+    private func activityBreakdown(from blocks: [TimelineBlock]) -> [ActivityBreakdownItem] {
+        var totals: [String: (label: String, category: FocusCategory, minutes: Int)] = [:]
+
+        for block in blocks {
+            let duration = minutes(in: block)
+            guard duration > 0 else { continue }
+
+            let key = "\(block.category.rawValue)|\(block.label.lowercased())"
+            if let existing = totals[key] {
+                totals[key] = (
+                    label: existing.label,
+                    category: existing.category,
+                    minutes: existing.minutes + duration
+                )
+            } else {
+                totals[key] = (label: block.label, category: block.category, minutes: duration)
+            }
+        }
+
+        return totals.values
+            .sorted { lhs, rhs in
+                if lhs.minutes == rhs.minutes { return lhs.label < rhs.label }
+                return lhs.minutes > rhs.minutes
+            }
+            .prefix(8)
+            .map {
+                ActivityBreakdownItem(label: $0.label, category: $0.category, minutes: $0.minutes)
+            }
     }
 
     private func observations(
@@ -427,6 +459,18 @@ public struct ReplayEngine: Sendable {
     }
 }
 
+public struct ActivityBreakdownItem: Codable, Equatable, Sendable {
+    public var label: String
+    public var category: FocusCategory
+    public var minutes: Int
+
+    public init(label: String, category: FocusCategory, minutes: Int) {
+        self.label = label
+        self.category = category
+        self.minutes = minutes
+    }
+}
+
 public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var totalTrackedMinutes: Int
     public var productiveMinutes: Int
@@ -442,6 +486,7 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var longestProductiveBlockLabel: String?
     public var longestProductiveBlockMinutes: Int?
     public var worstDriftTrigger: String?
+    public var topActivities: [ActivityBreakdownItem]
     public var topProductiveLabels: [String]
     public var topDistractions: [String]
     public var observations: [String]

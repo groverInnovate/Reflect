@@ -100,3 +100,7 @@
 - Improved the existing stable Insights tab with coding-like time, deep-work time, fragmented productive time, top productive threads, and a next action.
 - Kept dashboard structure unchanged to avoid reintroducing the native Today dashboard crash path.
 - `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Reworked the stable dashboard into three user-facing tabs: Daily Review, Activity Timeline, and Focus Breaks.
+- Added ranked activity breakdowns so the dashboard answers where time went, including productive, study/research, coding/tooling, distracting/wasted, and idle time.
+- Added clearer drift-prevention copy that explains whether notifications can interrupt future focus breaks.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

@@ -125,6 +125,8 @@ struct ReplayEngineTests {
         #expect(report.neutralMinutes == 0)
         #expect(report.driftCount == 1)
         #expect(report.longestProductiveBlockLabel == "Research reading")
+        #expect(report.topActivities.first == ActivityBreakdownItem(label: "Research reading", category: .productive, minutes: 60))
+        #expect(report.topActivities.contains(ActivityBreakdownItem(label: "Twitter", category: .distracting, minutes: 15)))
         #expect(report.topProductiveLabels.first == "Research reading")
         #expect(report.topDistractions.first == "Twitter")
         #expect(!report.nextAction.isEmpty)
