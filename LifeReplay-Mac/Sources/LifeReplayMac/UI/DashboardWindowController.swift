@@ -13,6 +13,8 @@ final class DashboardWindowController: NSWindowController {
     private let timelineTextView = NSTextView()
     private let driftTextView = NSTextView()
     private let rawTextView = NSTextView()
+    private let refreshButton = NSButton(title: "Refresh Today's Review", target: nil, action: nil)
+    private let reviewStatusLabel = NSTextField(labelWithString: "")
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .none
@@ -63,19 +65,59 @@ final class DashboardWindowController: NSWindowController {
     private func configureContent() {
         guard let contentView = window?.contentView else { return }
 
+        let stackView = NSStackView()
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.orientation = .vertical
+        stackView.spacing = 12
+
+        let headerView = NSStackView()
+        headerView.orientation = .horizontal
+        headerView.alignment = .centerY
+        headerView.spacing = 12
+
+        refreshButton.target = self
+        refreshButton.action = #selector(refreshTodayReview)
+        refreshButton.bezelStyle = .rounded
+        refreshButton.controlSize = .large
+
+        reviewStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        reviewStatusLabel.textColor = DashboardStyle.secondaryText
+        reviewStatusLabel.lineBreakMode = .byTruncatingTail
+
+        headerView.addArrangedSubview(refreshButton)
+        headerView.addArrangedSubview(reviewStatusLabel)
+        headerView.setHuggingPriority(.defaultLow, for: .horizontal)
+        reviewStatusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
         let tabView = NSTabView()
         tabView.translatesAutoresizingMaskIntoConstraints = false
         tabView.addTabViewItem(tab(title: "Daily Review", textView: summaryTextView))
         tabView.addTabViewItem(tab(title: "Activity Timeline", textView: timelineTextView))
         tabView.addTabViewItem(tab(title: "Focus Breaks", textView: driftTextView))
 
-        contentView.addSubview(tabView)
+        stackView.addArrangedSubview(headerView)
+        stackView.addArrangedSubview(tabView)
+        contentView.addSubview(stackView)
         NSLayoutConstraint.activate([
-            tabView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            tabView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            tabView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            tabView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
+            tabView.heightAnchor.constraint(greaterThanOrEqualToConstant: 480),
         ])
+    }
+
+    @objc private func refreshTodayReview() {
+        refreshButton.isEnabled = false
+        reviewStatusLabel.stringValue = "Generating today's review..."
+        Task { @MainActor in
+            let replay = await store.generateDailyReplayWithNarrative()
+            reviewStatusLabel.stringValue = replay.map {
+                "Updated \($0.generatedAt.formatted(date: .omitted, time: .shortened))"
+            } ?? "Could not generate review"
+            refreshButton.isEnabled = true
+            reload()
+        }
     }
 
     private func tab(title: String, textView: NSTextView) -> NSTabViewItem {

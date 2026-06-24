@@ -99,3 +99,7 @@ Added a pure `FocusProtectionEngine` that fires when a distracting app/domain fo
 ## 2026-06-24 - Use window titles for study/research classification
 
 Expanded category matching to include window titles alongside domains, bundle IDs, and app names, then seeded more docs/course/research defaults. The alternative was relying only on app/domain, which misses common study cases like lecture PDFs opened in Preview.
+
+## 2026-06-24 - Put review regeneration inside the dashboard
+
+Added a native dashboard refresh button that regenerates today's replay and shows the updated time. The alternative was keeping generation only in the menu bar, but the review action belongs next to the report the user is reading.

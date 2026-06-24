@@ -114,3 +114,5 @@
 - Expanded category matching to include window titles, improving study/research detection for lecture PDFs and similar materials.
 - Added productive defaults for docs/course/research surfaces such as Google Docs, developer docs, docs.rs, arXiv, Overleaf, Coursera, edX, and PDF/lecture/course titles.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a dashboard-level "Refresh Today's Review" button that regenerates the daily replay and shows the last updated time.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
