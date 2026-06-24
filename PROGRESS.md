@@ -32,10 +32,6 @@
   - [x] Daily replay snapshots persisted to SwiftData
   - [x] Dashboard timeline UI implemented
   - [x] Journal-style daily insights implemented
-  - [x] Native Today journal dashboard implemented
-  - [x] Timeline labels enriched from window titles and browser domains
-  - [x] Dashboard can generate today's saved journal directly
-  - [x] Tomorrow Target added to daily insights
   - [ ] End-of-day real usage check completed
 - [ ] Phase 4 - On-device narrative summary
   - [x] Deterministic fallback summary implemented
@@ -98,20 +94,6 @@
 - Added `DailyInsightReport` with productive, study-like, distracting/wasted, idle, focus, top-distraction, and observation fields.
 - Added a Dashboard Insights tab and richer Markdown export summaries so the app reads more like an end-of-day productivity journal.
 - `swift test` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a first-position Today tab with metric cards, journal summary, observations, focus break points, timeline preview, and permission/save status.
-- `swift test` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Timeline generation now derives richer journal labels from raw event context, including coding project names and distracting browser domains.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a dashboard-level "Generate Today's Journal" button so the end-of-day save action is visible in the main experience.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Daily insights now include a Tomorrow Target in the dashboard, text insight tab, and Markdown export.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Fixed an `Open Dashboard` crash by replacing `NSTabView` with a custom tab button row and content container.
-- Updated the bundle script to recreate the `.app`, add `PkgInfo`, and clear extended attributes before signing.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Fixed the follow-up dashboard crash by removing SwiftData `#Predicate` fetches from the store and filtering day ranges in Swift.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Fixed the 21:55 dashboard crash by replacing store-side SwiftData model `filter`/`first` convenience closures with explicit loops.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Hardened dashboard data loading further by detaching fetched `ActivityEvent` rows and avoiding model-object closures in category seed and dashboard rendering paths.
-- `swift test` passes with 12 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Rolled back the unstable native Today dashboard and later crash-fix stack to the last known stable text dashboard checkpoint.
+- Hardened `scripts/build-mac-app.sh` to use a repo-local module cache, disable SwiftPM's nested sandbox, recreate the `.app`, add `PkgInfo`, clear xattrs, and sign consistently.
+- `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

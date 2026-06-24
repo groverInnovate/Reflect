@@ -118,46 +118,5 @@ struct ReplayEngineTests {
         #expect(report.topDistractions.first == "Twitter")
         #expect(report.journalSummary.contains("productive"))
         #expect(report.journalSummary.contains("Distracting/wasted"))
-        #expect(!report.tomorrowTarget.isEmpty)
-    }
-
-    @Test("timeline labels use window titles and domains for journal context")
-    func timelineLabelsUseEventContext() {
-        let start = Date(timeIntervalSince1970: 0)
-        let sessions = [
-            FocusSession(
-                start: start,
-                end: start.addingTimeInterval(1_800),
-                category: .productive,
-                primaryAppName: "VS Code"
-            ),
-            FocusSession(
-                start: start.addingTimeInterval(2_000),
-                end: start.addingTimeInterval(2_600),
-                category: .distracting,
-                primaryAppName: "Brave"
-            ),
-        ]
-        let events = [
-            ActivityEvent(
-                timestamp: start.addingTimeInterval(10),
-                kind: .appActivated,
-                appBundleID: "com.microsoft.VSCode",
-                appName: "VS Code",
-                windowTitle: "main.rs - lean-sim - Visual Studio Code"
-            ),
-            ActivityEvent(
-                timestamp: start.addingTimeInterval(2_020),
-                kind: .browserDomain,
-                appBundleID: "com.brave.Browser",
-                appName: "Brave",
-                browserDomain: "twitter.com"
-            ),
-        ]
-
-        let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(2_600))
-
-        #expect(blocks[0].label == "Coding - lean-sim")
-        #expect(blocks[1].label == "Distraction - twitter.com")
     }
 }

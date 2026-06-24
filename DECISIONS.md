@@ -72,30 +72,6 @@ The focus engine now computes idle overlap per session before scoring. Without t
 
 Raw timeline blocks were not enough for the product promise, so replay generation now produces a journal-oriented `DailyInsightReport` with productive time, study-like time, distracting/wasted time, idle time, top pulls, and plain observations. The alternative was to keep improving the timeline display, but Mohit needs interpreted end-of-day insight, not just telemetry.
 
-## 2026-06-23 - Make the dashboard open on the journal
+## 2026-06-24 - Roll back unstable dashboard work
 
-Changed the first dashboard tab from text diagnostics to a native "Today" journal view with score, metric cards, observations, focus break points, and timeline preview. The raw text tabs stay available for debugging; the alternative was to polish the existing text output, but the product needs instant visual comprehension at day-end.
-
-## 2026-06-23 - Enrich replay labels from event context
-
-Timeline blocks now use raw window titles and browser domains to name work more specifically, such as `Coding - lean-sim` instead of just `VS Code`. The alternative was to leave labels as app names, but that makes the journal too vague to answer "what did I actually do?"
-
-## 2026-06-23 - Add a tomorrow target to daily insights
-
-Daily insights now end with one concrete next-day target based on focus score, drift count, distraction time, and best productive block. The alternative was to keep the journal purely descriptive, but Mohit wants insights that actively improve tomorrow's productivity.
-
-## 2026-06-23 - Replace NSTabView after dashboard crash
-
-Crash reports showed `Open Dashboard` failing inside `NSTabView`'s internal segmented tab control on macOS 26. Replaced `NSTabView` with a small custom button tab bar and content container; the alternative was to keep tweaking the new journal layout while staying on the crashing AppKit path.
-
-## 2026-06-23 - Avoid SwiftData #Predicate in dashboard fetches
-
-The next dashboard crash report showed a fault inside SwiftData's generated `#Predicate` code while fetching today's events. Replaced store predicates with sorted fetches plus in-memory date filtering; the alternative was to keep relying on SwiftData predicate codegen for tiny local datasets, which is not worth the crash risk.
-
-## 2026-06-23 - Avoid closure filtering over SwiftData models
-
-The 21:55 crash report moved from `#Predicate` into the Swift `filter` closure over fetched `ActivityEvent` models. Replaced store-side higher-order filtering/selection over SwiftData models with explicit loops to avoid Swift executor/runtime crashes on this macOS build.
-
-## 2026-06-23 - Detach dashboard events from SwiftData
-
-The next crash report showed the same executor failure inside `categorySeeds()` while mapping SwiftData-backed `AppCategory` objects. Dashboard event fetches now copy `ActivityEvent` rows into detached objects, category seed creation uses explicit loops, and dashboard rendering avoids closures over live model objects. The alternative was to keep patching individual stack frames, but the safer product path is to keep SwiftData models out of dashboard analysis/render closures.
+Rolled back the native Today dashboard, enriched-label pass, tomorrow target, and follow-up crash-fix commits to restore the last known stable text dashboard state. The alternative was to keep patching forward, but repeated crash reports showed we needed a stable checkpoint before rebuilding the product surface.

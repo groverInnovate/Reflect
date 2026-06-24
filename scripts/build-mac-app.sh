@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_DIR="$(cd "$ROOT_DIR" && swift build --product LifeReplayMac --show-bin-path)"
+export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
+BIN_DIR="$(cd "$ROOT_DIR" && swift build --disable-sandbox --product LifeReplayMac --show-bin-path)"
 APP_DIR="$ROOT_DIR/.build/LifeReplayMac.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -46,7 +47,6 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
 PLIST
 
 printf 'APPL????' > "$CONTENTS_DIR/PkgInfo"
-
 xattr -cr "$APP_DIR"
 codesign --force --deep --sign - --identifier com.mohitgrover.LifeReplayMac "$APP_DIR" >/dev/null
 

@@ -82,18 +82,10 @@ final class LifeReplayStore {
     }
 
     func refreshTodayAnalysis(now: Date = Date()) -> (analysis: FocusAnalysis, newDrifts: [DriftEvent]) {
-        var existingDriftKeys: Set<String> = []
-        for drift in driftEventsForToday(now: now) {
-            existingDriftKeys.insert(driftKey(drift))
-        }
+        let existingDriftKeys = Set(driftEventsForToday(now: now).map(driftKey))
         let events = eventsForToday(now: now)
         let analysis = makeFocusEngine().analyze(events: events, now: now)
-        var newDrifts: [DriftEvent] = []
-        for drift in analysis.driftEvents {
-            if !existingDriftKeys.contains(driftKey(drift)) {
-                newDrifts.append(drift)
-            }
-        }
+        let newDrifts = analysis.driftEvents.filter { !existingDriftKeys.contains(driftKey($0)) }
 
         replaceTodaySessionsAndDrifts(with: analysis, now: now)
         return (analysis, newDrifts)
@@ -190,20 +182,17 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
+        let predicate = #Predicate<ActivityEvent> { event in
+            event.timestamp >= start && event.timestamp < end
+        }
         var descriptor = FetchDescriptor<ActivityEvent>(
+            predicate: predicate,
             sortBy: [SortDescriptor(\ActivityEvent.timestamp, order: .forward)]
         )
-        descriptor.fetchLimit = 10_000
+        descriptor.fetchLimit = 2_000
 
         do {
-            var events: [ActivityEvent] = []
-            for event in try context.fetch(descriptor) {
-                let timestamp = event.timestamp
-                if timestamp >= start && timestamp < end {
-                    events.append(detachedActivityEvent(from: event))
-                }
-            }
-            return events
+            return try context.fetch(descriptor)
         } catch {
             logger.error("Failed to fetch today's activity events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -238,19 +227,17 @@ final class LifeReplayStore {
     func existingDailyReplay(for date: Date = Date()) -> DailyReplay? {
         let day = Calendar.current.startOfDay(for: date)
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
+        let predicate = #Predicate<DailyReplay> { replay in
+            replay.date >= day && replay.date < nextDay
+        }
         var descriptor = FetchDescriptor<DailyReplay>(
+            predicate: predicate,
             sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
         )
-        descriptor.fetchLimit = 200
+        descriptor.fetchLimit = 1
 
         do {
-            for replay in try context.fetch(descriptor) {
-                let replayDate = replay.date
-                if replayDate >= day && replayDate < nextDay {
-                    return replay
-                }
-            }
-            return nil
+            return try context.fetch(descriptor).first
         } catch {
             logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -274,31 +261,26 @@ final class LifeReplayStore {
     func weeklyRollup(now: Date = Date()) -> WeeklyRollup {
         let calendar = Calendar.current
         let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+        let predicate = #Predicate<DailyReplay> { replay in
+            replay.date >= start && replay.date <= now
+        }
         let descriptor = FetchDescriptor<DailyReplay>(
+            predicate: predicate,
             sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
         )
 
-        var replays: [DailyReplay] = []
+        let replays: [DailyReplay]
         do {
-            for replay in try context.fetch(descriptor) {
-                let replayDate = replay.date
-                if replayDate >= start && replayDate <= now {
-                    replays.append(replay)
-                }
-            }
+            replays = try context.fetch(descriptor)
         } catch {
             logger.error("Failed to fetch weekly rollup: \(error.localizedDescription, privacy: .public)")
+            replays = []
         }
 
-        var totalScore = 0
-        var best: DailyReplay?
-        for replay in replays {
-            totalScore += replay.focusScore
-            if best == nil || replay.focusScore > (best?.focusScore ?? 0) {
-                best = replay
-            }
-        }
-        let average = replays.isEmpty ? 0 : Int((Double(totalScore) / Double(replays.count)).rounded())
+        let average = replays.isEmpty
+            ? 0
+            : Int((Double(replays.reduce(0) { $0 + $1.focusScore }) / Double(replays.count)).rounded())
+        let best = replays.max { $0.focusScore < $1.focusScore }
         return WeeklyRollup(days: replays.count, averageFocusScore: average, bestDay: best, latestDays: replays)
     }
 
@@ -309,10 +291,7 @@ final class LifeReplayStore {
         descriptor.fetchLimit = 1
 
         do {
-            for replay in try context.fetch(descriptor) {
-                return replay
-            }
-            return nil
+            return try context.fetch(descriptor).first
         } catch {
             logger.error("Failed to fetch latest daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
@@ -343,10 +322,6 @@ final class LifeReplayStore {
         ]
         lines += insights.observations.map { "- \($0)" }
         lines += [
-            "",
-            "## Tomorrow Target",
-            "",
-            insights.tomorrowTarget,
             "",
             "## Timeline",
             "",
@@ -388,18 +363,16 @@ final class LifeReplayStore {
 
     func exportConfiguration(to url: URL) throws {
         let settings = focusSettings()
-        var categoryExports: [CategoryExport] = []
-        for category in categories() {
-            categoryExports.append(CategoryExport(
-                matchPattern: category.matchPattern,
-                displayName: category.displayName,
-                category: category.category.rawValue,
-                isUserEdited: category.isUserEdited
-            ))
-        }
         let export = ConfigurationExport(
             exportedAt: Date(),
-            categories: categoryExports,
+            categories: categories().map {
+                CategoryExport(
+                    matchPattern: $0.matchPattern,
+                    displayName: $0.displayName,
+                    category: $0.category.rawValue,
+                    isUserEdited: $0.isUserEdited
+                )
+            },
             focusSettings: FocusSettingsExport(
                 idleThresholdSeconds: settings.idleThresholdSeconds,
                 sessionMinimumDurationSeconds: settings.sessionMinimumDurationSeconds,
@@ -417,11 +390,9 @@ final class LifeReplayStore {
     }
 
     func categorySeeds() -> [AppCategorySeed] {
-        var seeds: [AppCategorySeed] = []
-        for category in categories() {
-            seeds.append(AppCategorySeed(category.matchPattern, category.displayName, category.category))
+        categories().map {
+            AppCategorySeed($0.matchPattern, $0.displayName, $0.category)
         }
-        return seeds
     }
 
     func makeFocusEngine() -> FocusEngine {
@@ -435,7 +406,7 @@ final class LifeReplayStore {
         var descriptor = FetchDescriptor<FocusSettings>()
         descriptor.fetchLimit = 1
         do {
-            for settings in try context.fetch(descriptor) {
+            if let settings = try context.fetch(descriptor).first {
                 return settings
             }
         } catch {
@@ -495,19 +466,16 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
+        let predicate = #Predicate<DriftEvent> { event in
+            event.timestamp >= start && event.timestamp < end
+        }
         let descriptor = FetchDescriptor<DriftEvent>(
+            predicate: predicate,
             sortBy: [SortDescriptor(\DriftEvent.timestamp, order: .forward)]
         )
 
         do {
-            var drifts: [DriftEvent] = []
-            for event in try context.fetch(descriptor) {
-                let timestamp = event.timestamp
-                if timestamp >= start && timestamp < end {
-                    drifts.append(event)
-                }
-            }
-            return drifts
+            return try context.fetch(descriptor)
         } catch {
             logger.error("Failed to fetch today's drift events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -518,19 +486,13 @@ final class LifeReplayStore {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
-        let descriptor = FetchDescriptor<FocusSession>(
-            sortBy: [SortDescriptor(\FocusSession.start, order: .forward)]
-        )
+        let predicate = #Predicate<FocusSession> { session in
+            session.start >= start && session.start < end
+        }
+        let descriptor = FetchDescriptor<FocusSession>(predicate: predicate)
 
         do {
-            var sessions: [FocusSession] = []
-            for session in try context.fetch(descriptor) {
-                let sessionStart = session.start
-                if sessionStart >= start && sessionStart < end {
-                    sessions.append(session)
-                }
-            }
-            return sessions
+            return try context.fetch(descriptor)
         } catch {
             logger.error("Failed to fetch today's focus sessions: \(error.localizedDescription, privacy: .public)")
             return []
@@ -573,46 +535,32 @@ final class LifeReplayStore {
         return "\(Int(event.timestamp.timeIntervalSince1970))-\(event.switchCountInWindow)-\(triggerKey)"
     }
 
-    private func detachedActivityEvent(from event: ActivityEvent) -> ActivityEvent {
-        ActivityEvent(
-            timestamp: event.timestamp,
-            kind: ActivityKind(rawValue: event.kindRawValue) ?? .appActivated,
-            appBundleID: event.appBundleID,
-            appName: event.appName,
-            windowTitle: event.windowTitle,
-            browserDomain: event.browserDomain,
-            source: event.source
-        )
-    }
-
     private func csvForActivityEvents(_ events: [ActivityEvent]) -> String {
         var rows = ["timestamp,kind,appBundleID,appName,windowTitle,browserDomain,source"]
-        for event in events {
-            let values = [
-                event.timestamp.ISO8601Format(),
-                event.kind.rawValue,
-                event.appBundleID ?? "",
-                event.appName ?? "",
-                event.windowTitle ?? "",
-                event.browserDomain ?? "",
-                event.source,
-            ]
-            rows.append(values.map(csvEscape).joined(separator: ","))
+        rows += events.map {
+            [
+                $0.timestamp.ISO8601Format(),
+                $0.kind.rawValue,
+                $0.appBundleID ?? "",
+                $0.appName ?? "",
+                $0.windowTitle ?? "",
+                $0.browserDomain ?? "",
+                $0.source,
+            ].map(csvEscape).joined(separator: ",")
         }
         return rows.joined(separator: "\n") + "\n"
     }
 
     private func csvForDriftEvents(_ drifts: [DriftEvent]) -> String {
         var rows = ["timestamp,triggerAppNames,switchCountInWindow,baselineSwitchRate,severity"]
-        for drift in drifts {
-            let values = [
-                drift.timestamp.ISO8601Format(),
-                drift.triggerAppNames.joined(separator: "; "),
-                String(drift.switchCountInWindow),
-                String(drift.baselineSwitchRate),
-                String(drift.severity),
-            ]
-            rows.append(values.map(csvEscape).joined(separator: ","))
+        rows += drifts.map {
+            [
+                $0.timestamp.ISO8601Format(),
+                $0.triggerAppNames.joined(separator: "; "),
+                String($0.switchCountInWindow),
+                String($0.baselineSwitchRate),
+                String($0.severity),
+            ].map(csvEscape).joined(separator: ",")
         }
         return rows.joined(separator: "\n") + "\n"
     }
