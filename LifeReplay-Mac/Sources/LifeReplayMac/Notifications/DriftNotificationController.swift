@@ -95,6 +95,21 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         )
     }
 
+    func notifyFocusProtection(triggerName: String, previousContext: String, productiveMinutes: Int) {
+        guard isBundledApp else {
+            logger.info("Focus protection notification skipped while running outside an app bundle")
+            return
+        }
+        requestAuthorizationIfNeeded()
+
+        sendNotification(
+            identifier: "focus-protection-\(Date().timeIntervalSince1970)",
+            title: "Protect this focus block",
+            body: "You were in \(previousContext) for \(productiveMinutes)m, then opened \(triggerName). Pause before the drift sticks.",
+            categoryIdentifier: driftCategoryIdentifier
+        )
+    }
+
     func sendTestNotification() {
         guard isBundledApp else {
             logger.info("Test notification skipped while running outside an app bundle")

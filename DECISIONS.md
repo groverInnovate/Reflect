@@ -91,3 +91,7 @@ Added macOS sleep/wake observers that write idle start/end events around lid-clo
 ## 2026-06-24 - Polish dashboard visually without changing its architecture
 
 Styled the stable AppKit dashboard with richer typography, calmer report backgrounds, and color-coded productivity/distraction cues. The alternative was a larger custom card UI, but the recent crash history makes an incremental rich-text design safer while still improving readability.
+
+## 2026-06-24 - Add real-time focus protection before daily drift review
+
+Added a pure `FocusProtectionEngine` that fires when a distracting app/domain follows a sustained productive block, then wired it to immediate local notifications with a 10-minute cooldown. The alternative was waiting for end-of-day drift analysis only, but the product needs to interrupt distractions while they are happening.

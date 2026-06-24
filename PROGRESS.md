@@ -107,3 +107,7 @@
 - Added macOS sleep/wake observers so closing the Mac lid records an idle interval instead of stretching the previous app session through sleep.
 - Polished the stable dashboard with larger typography, warmer report background, and color-coded productive/distracting/idle/status lines.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a real-time `FocusProtectionEngine` that detects when a distracting app/domain follows a sustained productive block.
+- Wired focus protection into live collection with a 10-minute notification cooldown so it can interrupt distractions without spamming.
+- Added synthetic tests for focus-protection alerts and short-block suppression.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 13 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

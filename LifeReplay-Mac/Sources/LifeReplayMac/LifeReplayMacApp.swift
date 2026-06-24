@@ -22,6 +22,8 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var replayHistoryWindow: ReplayHistoryWindowController?
     private var weeklyRollupWindow: WeeklyRollupWindowController?
     private var eventCount = 0
+    private var lastFocusProtectionNotificationAt: Date?
+    private let focusProtectionCooldown: TimeInterval = 10 * 60
     private var collectionEnabled: Bool {
         get {
             if UserDefaults.standard.object(forKey: DefaultsKey.collectionEnabled) == nil {
@@ -37,6 +39,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var collector = MacActivityCollector { [weak self] event in
         guard let self else { return }
         self.store?.record(event)
+        self.maybeSendFocusProtectionAlert(for: event)
         self.eventCount = self.store?.eventsForToday().count ?? self.eventCount + 1
         let newDrifts = self.store?.refreshTodayAnalysis().newDrifts ?? []
         for drift in newDrifts {
@@ -122,6 +125,23 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.notificationSummary = summary
             self?.updateMenu()
         }
+    }
+
+    private func maybeSendFocusProtectionAlert(for event: ActivityEvent) {
+        guard let store else { return }
+        let now = Date()
+        if let lastFocusProtectionNotificationAt,
+           now.timeIntervalSince(lastFocusProtectionNotificationAt) < focusProtectionCooldown {
+            return
+        }
+
+        guard let alert = store.focusProtectionAlert(for: event, now: now) else { return }
+        lastFocusProtectionNotificationAt = now
+        notifications.notifyFocusProtection(
+            triggerName: alert.triggerName,
+            previousContext: alert.previousContext,
+            productiveMinutes: alert.productiveMinutes
+        )
     }
 
     @objc private func toggleCollection() {

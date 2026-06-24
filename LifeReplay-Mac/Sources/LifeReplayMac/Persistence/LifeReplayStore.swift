@@ -28,6 +28,18 @@ struct WeeklyRollup {
     var latestDays: [DailyReplay]
 }
 
+struct FocusProtectionAlert {
+    var triggerName: String
+    var previousContext: String
+    var productiveMinutes: Int
+
+    init(signal: FocusProtectionSignal) {
+        triggerName = signal.triggerName
+        previousContext = signal.previousContext
+        productiveMinutes = signal.productiveMinutes
+    }
+}
+
 private struct ConfigurationExport: Codable {
     var exportedAt: Date
     var categories: [CategoryExport]
@@ -400,6 +412,22 @@ final class LifeReplayStore {
             configuration: focusSettings().focusEngineConfiguration,
             resolver: CategoryResolver(seeds: categorySeeds())
         )
+    }
+
+    func focusProtectionAlert(for event: ActivityEvent, now: Date = Date()) -> FocusProtectionAlert? {
+        guard event.kind == .appActivated || event.kind == .browserDomain else { return nil }
+
+        let resolver = CategoryResolver(seeds: categorySeeds())
+        guard resolver.category(for: event) == .distracting else { return nil }
+
+        let events = eventsForToday(now: now).filter { $0.timestamp <= event.timestamp }
+        let minimumProtectedSeconds = max(5 * 60, focusSettings().productiveSessionMinimumMinutes * 60)
+        let protectionEngine = FocusProtectionEngine(
+            configuration: FocusProtectionConfiguration(minimumProtectedProductiveDuration: minimumProtectedSeconds),
+            focusEngine: makeFocusEngine(),
+            resolver: resolver
+        )
+        return protectionEngine.signal(for: event, events: events).map(FocusProtectionAlert.init(signal:))
     }
 
     func focusSettings() -> FocusSettings {
