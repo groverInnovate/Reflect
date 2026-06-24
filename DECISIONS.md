@@ -75,3 +75,7 @@ Raw timeline blocks were not enough for the product promise, so replay generatio
 ## 2026-06-24 - Roll back unstable dashboard work
 
 Rolled back the native Today dashboard, enriched-label pass, tomorrow target, and follow-up crash-fix commits to restore the last known stable text dashboard state. The alternative was to keep patching forward, but repeated crash reports showed we needed a stable checkpoint before rebuilding the product surface.
+
+## 2026-06-24 - Improve insights inside stable text dashboard
+
+Kept the working text-tab dashboard and improved only the pure replay insight model plus text rendering. Added coding-like time, deep-work time, fragmented productive time, top productive threads, and a next action; the alternative was another UI rebuild, which is too risky until the stable dashboard has more real usage.

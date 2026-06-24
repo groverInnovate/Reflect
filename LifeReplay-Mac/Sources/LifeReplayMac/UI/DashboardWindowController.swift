@@ -140,6 +140,9 @@ final class DashboardWindowController: NSWindowController {
             "--------------",
             "Productive:   \(formatMinutes(insights.productiveMinutes))",
             "Study-like:   \(formatMinutes(insights.studyLikeMinutes))",
+            "Coding-like:  \(formatMinutes(insights.codingLikeMinutes))",
+            "Deep work:    \(formatMinutes(insights.deepWorkMinutes))",
+            "Fragmented productive: \(formatMinutes(insights.fragmentedProductiveMinutes))",
             "Distracting/Wasted: \(formatMinutes(insights.distractingMinutes))",
             "Neutral:      \(formatMinutes(insights.neutralMinutes))",
             "Idle/Away:    \(formatMinutes(insights.idleMinutes))",
@@ -150,6 +153,7 @@ final class DashboardWindowController: NSWindowController {
             "Score: \(insights.focusScore)/100",
             "Drift events: \(insights.driftCount)",
             "Best block: \(insights.longestProductiveBlockLabel ?? "none")\(insights.longestProductiveBlockMinutes.map { " (\(formatMinutes($0)))" } ?? "")",
+            "Top productive threads: \(insights.topProductiveLabels.isEmpty ? "none detected" : insights.topProductiveLabels.joined(separator: ", "))",
             "Top distractions: \(insights.topDistractions.isEmpty ? "none detected" : insights.topDistractions.joined(separator: ", "))",
             "",
             "Journal",
@@ -160,6 +164,12 @@ final class DashboardWindowController: NSWindowController {
             "------------",
         ]
         lines += insights.observations.map { "- \($0)" }
+        lines += [
+            "",
+            "Next Action",
+            "-----------",
+            insights.nextAction,
+        ]
         return lines.joined(separator: "\n")
     }
 

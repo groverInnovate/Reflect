@@ -97,3 +97,6 @@
 - Rolled back the unstable native Today dashboard and later crash-fix stack to the last known stable text dashboard checkpoint.
 - Hardened `scripts/build-mac-app.sh` to use a repo-local module cache, disable SwiftPM's nested sandbox, recreate the `.app`, add `PkgInfo`, clear xattrs, and sign consistently.
 - `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Improved the existing stable Insights tab with coding-like time, deep-work time, fragmented productive time, top productive threads, and a next action.
+- Kept dashboard structure unchanged to avoid reintroducing the native Today dashboard crash path.
+- `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

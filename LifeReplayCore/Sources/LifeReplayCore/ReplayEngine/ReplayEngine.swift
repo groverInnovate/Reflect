@@ -119,14 +119,30 @@ public struct ReplayEngine: Sendable {
         let worstDrift = driftEvents.max { $0.severity < $1.severity }
         let topDistractions = topDistractionNames(blocks: blocks, driftEvents: driftEvents)
         let studyMinutes = studyLikeMinutes(in: blocks)
+        let codingMinutes = codingLikeMinutes(in: blocks)
+        let deepWorkMinutes = deepWorkMinutes(in: blocks)
+        let fragmentedProductiveMinutes = fragmentedProductiveMinutes(in: blocks)
+        let topProductiveLabels = topLabels(for: .productive, in: blocks)
         let observations = observations(
             focusScore: focusScore,
             productiveMinutes: productiveMinutes,
+            studyMinutes: studyMinutes,
+            codingMinutes: codingMinutes,
+            deepWorkMinutes: deepWorkMinutes,
+            fragmentedProductiveMinutes: fragmentedProductiveMinutes,
             distractingMinutes: distractingMinutes,
             idleMinutes: idleMinutes,
             totalMinutes: totalMinutes,
             driftEvents: driftEvents,
             longestProductiveBlock: longest,
+            topDistractions: topDistractions,
+            topProductiveLabels: topProductiveLabels
+        )
+        let nextAction = nextAction(
+            productiveMinutes: productiveMinutes,
+            deepWorkMinutes: deepWorkMinutes,
+            distractingMinutes: distractingMinutes,
+            driftEvents: driftEvents,
             topDistractions: topDistractions
         )
 
@@ -134,17 +150,22 @@ public struct ReplayEngine: Sendable {
             focusScore: focusScore,
             productiveMinutes: productiveMinutes,
             studyMinutes: studyMinutes,
+            codingMinutes: codingMinutes,
             distractingMinutes: distractingMinutes,
             idleMinutes: idleMinutes,
             driftCount: driftEvents.count,
             longestProductiveBlock: longest,
-            topDistractions: topDistractions
+            topDistractions: topDistractions,
+            nextAction: nextAction
         )
 
         return DailyInsightReport(
             totalTrackedMinutes: totalMinutes,
             productiveMinutes: productiveMinutes,
             studyLikeMinutes: studyMinutes,
+            codingLikeMinutes: codingMinutes,
+            deepWorkMinutes: deepWorkMinutes,
+            fragmentedProductiveMinutes: fragmentedProductiveMinutes,
             distractingMinutes: distractingMinutes,
             neutralMinutes: neutralMinutes,
             idleMinutes: idleMinutes,
@@ -153,8 +174,10 @@ public struct ReplayEngine: Sendable {
             longestProductiveBlockLabel: longest?.label,
             longestProductiveBlockMinutes: longest.map(minutes(in:)),
             worstDriftTrigger: worstDrift?.triggerAppNames.joined(separator: ", "),
+            topProductiveLabels: topProductiveLabels,
             topDistractions: topDistractions,
             observations: observations,
+            nextAction: nextAction,
             journalSummary: summary
         )
     }
@@ -194,7 +217,7 @@ public struct ReplayEngine: Sendable {
     }
 
     private func studyLikeMinutes(in blocks: [TimelineBlock]) -> Int {
-        let studyTerms = ["obsidian", "notion", "reading", "lecture", "study", "pdf", "books", "research"]
+        let studyTerms = ["obsidian", "notion", "reading", "lecture", "study", "pdf", "books", "research", "paper", "notes", "course", "docs"]
         return blocks.reduce(0) { total, block in
             let label = block.label.lowercased()
             let detail = block.detail?.lowercased() ?? ""
@@ -202,6 +225,37 @@ public struct ReplayEngine: Sendable {
                 return total
             }
             return total + minutes(in: block)
+        }
+    }
+
+    private func codingLikeMinutes(in blocks: [TimelineBlock]) -> Int {
+        let codingTerms = [
+            "vs code", "xcode", "terminal", "iterm", "github", "localhost", "cargo", "rust",
+            "foundry", "hardhat", "noir", "nargo", "postman", "bruno", "solidity"
+        ]
+        return blocks.reduce(0) { total, block in
+            let label = block.label.lowercased()
+            let detail = block.detail?.lowercased() ?? ""
+            guard block.category == .productive, codingTerms.contains(where: { label.contains($0) || detail.contains($0) }) else {
+                return total
+            }
+            return total + minutes(in: block)
+        }
+    }
+
+    private func deepWorkMinutes(in blocks: [TimelineBlock]) -> Int {
+        blocks.reduce(0) { total, block in
+            let duration = minutes(in: block)
+            guard block.category == .productive, duration >= 45 else { return total }
+            return total + duration
+        }
+    }
+
+    private func fragmentedProductiveMinutes(in blocks: [TimelineBlock]) -> Int {
+        blocks.reduce(0) { total, block in
+            let duration = minutes(in: block)
+            guard block.category == .productive, duration > 0, duration < 25 else { return total }
+            return total + duration
         }
     }
 
@@ -224,15 +278,34 @@ public struct ReplayEngine: Sendable {
             .map(\.key)
     }
 
+    private func topLabels(for category: FocusCategory, in blocks: [TimelineBlock]) -> [String] {
+        var counts: [String: Int] = [:]
+        for block in blocks where block.category == category {
+            counts[block.label, default: 0] += minutes(in: block)
+        }
+        return counts
+            .sorted { lhs, rhs in
+                if lhs.value == rhs.value { return lhs.key < rhs.key }
+                return lhs.value > rhs.value
+            }
+            .prefix(3)
+            .map(\.key)
+    }
+
     private func observations(
         focusScore: Int,
         productiveMinutes: Int,
+        studyMinutes: Int,
+        codingMinutes: Int,
+        deepWorkMinutes: Int,
+        fragmentedProductiveMinutes: Int,
         distractingMinutes: Int,
         idleMinutes: Int,
         totalMinutes: Int,
         driftEvents: [DriftEvent],
         longestProductiveBlock: TimelineBlock?,
-        topDistractions: [String]
+        topDistractions: [String],
+        topProductiveLabels: [String]
     ) -> [String] {
         var insights: [String] = []
 
@@ -242,6 +315,24 @@ public struct ReplayEngine: Sendable {
 
         let productiveShare = Double(productiveMinutes) / Double(max(1, totalMinutes))
         let distractingShare = Double(distractingMinutes) / Double(max(1, totalMinutes))
+
+        if let primary = topProductiveLabels.first, productiveMinutes > 0 {
+            insights.append("The main productive thread was \(primary), accounting for the largest visible work block.")
+        }
+
+        if codingMinutes > 0, studyMinutes > 0 {
+            insights.append("The day mixed \(formatMinutes(codingMinutes)) of coding-like work with \(formatMinutes(studyMinutes)) of study/research-like work.")
+        } else if codingMinutes > 0 {
+            insights.append("Most visible productive time looked coding/tooling-oriented: \(formatMinutes(codingMinutes)).")
+        } else if studyMinutes > 0 {
+            insights.append("Most visible productive time looked study/research-oriented: \(formatMinutes(studyMinutes)).")
+        }
+
+        if deepWorkMinutes >= 60 {
+            insights.append("Deep-work time was meaningful at \(formatMinutes(deepWorkMinutes)) in productive blocks of at least 45 minutes.")
+        } else if fragmentedProductiveMinutes >= 30 {
+            insights.append("Productive time was fragmented: \(formatMinutes(fragmentedProductiveMinutes)) came from short blocks under 25 minutes.")
+        }
 
         if productiveShare >= 0.65 {
             insights.append("Most tracked time was productive, which suggests the day had a strong work/study base.")
@@ -277,30 +368,53 @@ public struct ReplayEngine: Sendable {
             insights.append("Focus score was low; tomorrow's target should be one protected session before opening distracting sites.")
         }
 
-        return Array(insights.prefix(5))
+        return Array(insights.prefix(7))
     }
 
     private func journalSummary(
         focusScore: Int,
         productiveMinutes: Int,
         studyMinutes: Int,
+        codingMinutes: Int,
         distractingMinutes: Int,
         idleMinutes: Int,
         driftCount: Int,
         longestProductiveBlock: TimelineBlock?,
-        topDistractions: [String]
+        topDistractions: [String],
+        nextAction: String
     ) -> String {
         let bestBlock = longestProductiveBlock.map {
             " Best block: \($0.label) for \(formatMinutes(minutes(in: $0)))."
         } ?? ""
         let studyText = studyMinutes > 0 ? " \(formatMinutes(studyMinutes)) looked study/research-related." : ""
+        let codingText = codingMinutes > 0 ? " \(formatMinutes(codingMinutes)) looked coding/tooling-related." : ""
         let distractionText = distractingMinutes > 0
             ? " Distracting/wasted time was about \(formatMinutes(distractingMinutes))\(topDistractions.first.map { ", led by \($0)" } ?? "")."
             : " No explicit distracting block was detected."
         let driftText = driftCount == 0 ? " No focus drift was detected." : " Focus drift showed up \(driftCount) time\(driftCount == 1 ? "" : "s")."
         let idleText = idleMinutes > 0 ? " Idle/away time was \(formatMinutes(idleMinutes))." : ""
 
-        return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(distractionText)\(driftText)\(bestBlock)\(idleText) Focus score: \(focusScore)/100."
+        return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(codingText)\(distractionText)\(driftText)\(bestBlock)\(idleText) Focus score: \(focusScore)/100. Next: \(nextAction)"
+    }
+
+    private func nextAction(
+        productiveMinutes: Int,
+        deepWorkMinutes: Int,
+        distractingMinutes: Int,
+        driftEvents: [DriftEvent],
+        topDistractions: [String]
+    ) -> String {
+        if productiveMinutes == 0 {
+            return "start with one 45-minute work or study block before opening distracting sites."
+        }
+        if distractingMinutes >= 45 || driftEvents.count >= 2 {
+            let distraction = topDistractions.first ?? "the biggest distraction"
+            return "keep \(distraction) closed until after the first protected work block."
+        }
+        if deepWorkMinutes < 60, productiveMinutes >= 60 {
+            return "turn the useful work into one uninterrupted 60-minute block."
+        }
+        return "repeat the conditions around the best productive block."
     }
 
     private func formatMinutes(_ minutes: Int) -> String {
@@ -317,6 +431,9 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var totalTrackedMinutes: Int
     public var productiveMinutes: Int
     public var studyLikeMinutes: Int
+    public var codingLikeMinutes: Int
+    public var deepWorkMinutes: Int
+    public var fragmentedProductiveMinutes: Int
     public var distractingMinutes: Int
     public var neutralMinutes: Int
     public var idleMinutes: Int
@@ -325,7 +442,9 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var longestProductiveBlockLabel: String?
     public var longestProductiveBlockMinutes: Int?
     public var worstDriftTrigger: String?
+    public var topProductiveLabels: [String]
     public var topDistractions: [String]
     public var observations: [String]
+    public var nextAction: String
     public var journalSummary: String
 }

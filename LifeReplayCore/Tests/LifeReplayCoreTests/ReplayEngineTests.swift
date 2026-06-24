@@ -83,14 +83,21 @@ struct ReplayEngineTests {
                 detail: "PDF notes"
             ),
             TimelineBlock(
-                start: start.addingTimeInterval(3_900),
-                end: start.addingTimeInterval(4_800),
+                start: start.addingTimeInterval(4_900),
+                end: start.addingTimeInterval(5_500),
+                label: "VS Code",
+                category: .productive,
+                detail: "Terminal"
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(5_700),
+                end: start.addingTimeInterval(6_600),
                 label: "Twitter",
                 category: .distracting
             ),
             TimelineBlock(
-                start: start.addingTimeInterval(5_100),
-                end: start.addingTimeInterval(6_000),
+                start: start.addingTimeInterval(6_900),
+                end: start.addingTimeInterval(7_800),
                 label: "Idle period",
                 category: .neutral,
                 detail: "No keyboard or mouse input"
@@ -98,7 +105,7 @@ struct ReplayEngineTests {
         ]
         let drifts = [
             DriftEvent(
-                timestamp: start.addingTimeInterval(4_000),
+                timestamp: start.addingTimeInterval(5_800),
                 triggerAppNames: ["Twitter"],
                 switchCountInWindow: 8,
                 baselineSwitchRate: 12,
@@ -108,14 +115,19 @@ struct ReplayEngineTests {
 
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: drifts, focusScore: 74)
 
-        #expect(report.productiveMinutes == 60)
+        #expect(report.productiveMinutes == 70)
         #expect(report.studyLikeMinutes == 60)
+        #expect(report.codingLikeMinutes == 10)
+        #expect(report.deepWorkMinutes == 60)
+        #expect(report.fragmentedProductiveMinutes == 10)
         #expect(report.distractingMinutes == 15)
         #expect(report.idleMinutes == 15)
         #expect(report.neutralMinutes == 0)
         #expect(report.driftCount == 1)
         #expect(report.longestProductiveBlockLabel == "Research reading")
+        #expect(report.topProductiveLabels.first == "Research reading")
         #expect(report.topDistractions.first == "Twitter")
+        #expect(!report.nextAction.isEmpty)
         #expect(report.journalSummary.contains("productive"))
         #expect(report.journalSummary.contains("Distracting/wasted"))
     }
