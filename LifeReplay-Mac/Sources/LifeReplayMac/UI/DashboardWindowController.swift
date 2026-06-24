@@ -32,6 +32,7 @@ final class DashboardWindowController: NSWindowController {
             defer: false
         )
         window.title = "Life Replay Dashboard"
+        window.backgroundColor = DashboardStyle.windowBackground
         window.center()
 
         super.init(window: window)
@@ -54,9 +55,9 @@ final class DashboardWindowController: NSWindowController {
 
     private func renderCurrentData() {
         let data = dashboardData()
-        summaryTextView.string = renderDailyReview(data)
-        timelineTextView.string = renderTimeline(data.blocks)
-        driftTextView.string = renderFocusBreaks(data.analysis.driftEvents, insights: data.insights)
+        applyStyledReport(renderDailyReview(data), to: summaryTextView)
+        applyStyledReport(renderTimeline(data.blocks), to: timelineTextView)
+        applyStyledReport(renderFocusBreaks(data.analysis.driftEvents, insights: data.insights), to: driftTextView)
     }
 
     private func configureContent() {
@@ -84,12 +85,16 @@ final class DashboardWindowController: NSWindowController {
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .noBorder
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = DashboardStyle.reportBackground
 
         textView.isEditable = false
         textView.isSelectable = true
-        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        textView.textContainerInset = NSSize(width: 18, height: 18)
-        textView.backgroundColor = .textBackgroundColor
+        textView.isRichText = true
+        textView.font = DashboardStyle.bodyFont
+        textView.textContainerInset = NSSize(width: 28, height: 26)
+        textView.backgroundColor = DashboardStyle.reportBackground
+        textView.textColor = DashboardStyle.primaryText
         scrollView.documentView = textView
 
         item.view = scrollView
@@ -112,6 +117,7 @@ final class DashboardWindowController: NSWindowController {
     private func renderDailyReview(_ data: DashboardData) -> String {
         let insights = data.insights
         var lines: [String] = [
+            "Life Replay",
             "Daily Review - \(Date.now.formatted(date: .long, time: .omitted))",
             "",
             "Focus Score: \(insights.focusScore)/100 - \(focusQuality(insights.focusScore))",
@@ -201,6 +207,7 @@ final class DashboardWindowController: NSWindowController {
         }
         var lines = [
             "Activity Timeline",
+            "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             "-----------------",
             "This is the compact replay of what the Mac observed today.",
             "",
@@ -212,6 +219,7 @@ final class DashboardWindowController: NSWindowController {
     private func renderFocusBreaks(_ drifts: [DriftEvent], insights: DailyInsightReport) -> String {
         var lines = [
             "Focus Breaks",
+            "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             "------------",
             "Notifications: \(notificationSummary.rawValue)",
             notificationAdvice(),
@@ -317,6 +325,76 @@ final class DashboardWindowController: NSWindowController {
             "Notification status is still being checked."
         }
     }
+
+    private func applyStyledReport(_ report: String, to textView: NSTextView) {
+        let styled = NSMutableAttributedString()
+        let lines = report.components(separatedBy: "\n")
+
+        for (index, line) in lines.enumerated() {
+            let attributes = attributes(for: line, at: index, previousLine: index > 0 ? lines[index - 1] : nil)
+            styled.append(NSAttributedString(string: line, attributes: attributes))
+            if index < lines.count - 1 {
+                styled.append(NSAttributedString(string: "\n", attributes: DashboardStyle.bodyAttributes))
+            }
+        }
+
+        textView.textStorage?.setAttributedString(styled)
+    }
+
+    private func attributes(for line: String, at index: Int, previousLine: String?) -> [NSAttributedString.Key: Any] {
+        var attributes = DashboardStyle.bodyAttributes
+
+        if index == 0 {
+            attributes[.font] = DashboardStyle.titleFont
+            attributes[.foregroundColor] = DashboardStyle.titleText
+            attributes[.paragraphStyle] = DashboardStyle.titleParagraphStyle
+            return attributes
+        }
+
+        if index == 1, previousLine == "Life Replay" {
+            attributes[.font] = DashboardStyle.subtitleFont
+            attributes[.foregroundColor] = DashboardStyle.secondaryText
+            attributes[.paragraphStyle] = DashboardStyle.subtitleParagraphStyle
+            return attributes
+        }
+
+        if line.allSatisfy({ $0 == "-" }), !line.isEmpty {
+            attributes[.foregroundColor] = DashboardStyle.separator
+            return attributes
+        }
+
+        if isSectionHeader(line: line) {
+            attributes[.font] = DashboardStyle.sectionFont
+            attributes[.foregroundColor] = DashboardStyle.titleText
+            attributes[.paragraphStyle] = DashboardStyle.sectionParagraphStyle
+            return attributes
+        }
+
+        if line.contains("Productive") || line.contains("strong day") {
+            attributes[.foregroundColor] = DashboardStyle.productiveText
+        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") {
+            attributes[.foregroundColor] = DashboardStyle.distractingText
+        } else if line.contains("Idle") || line.contains("Neutral") {
+            attributes[.foregroundColor] = DashboardStyle.neutralText
+        } else if line.contains("Focus Score") || line.contains("Tracked time") || line.contains("Notifications") {
+            attributes[.font] = DashboardStyle.emphasisFont
+            attributes[.foregroundColor] = DashboardStyle.accentText
+        }
+
+        return attributes
+    }
+
+    private func isSectionHeader(line: String) -> Bool {
+        [
+            "Where Time Went",
+            "Focus Story",
+            "Journal",
+            "What To Do Next",
+            "Protection Status",
+            "Activity Timeline",
+            "Focus Breaks",
+        ].contains(line)
+    }
 }
 
 private struct DashboardData {
@@ -325,4 +403,58 @@ private struct DashboardData {
     var blocks: [TimelineBlock]
     var savedReplay: DailyReplay?
     var insights: DailyInsightReport
+}
+
+@MainActor
+private enum DashboardStyle {
+    static let windowBackground = NSColor(calibratedRed: 0.94, green: 0.95, blue: 0.96, alpha: 1)
+    static let reportBackground = NSColor(calibratedRed: 0.985, green: 0.985, blue: 0.975, alpha: 1)
+    static let titleText = NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.12, alpha: 1)
+    static let primaryText = NSColor(calibratedRed: 0.13, green: 0.15, blue: 0.17, alpha: 1)
+    static let secondaryText = NSColor(calibratedRed: 0.38, green: 0.42, blue: 0.46, alpha: 1)
+    static let accentText = NSColor(calibratedRed: 0.08, green: 0.28, blue: 0.52, alpha: 1)
+    static let productiveText = NSColor(calibratedRed: 0.05, green: 0.38, blue: 0.26, alpha: 1)
+    static let distractingText = NSColor(calibratedRed: 0.62, green: 0.13, blue: 0.13, alpha: 1)
+    static let neutralText = NSColor(calibratedRed: 0.43, green: 0.34, blue: 0.12, alpha: 1)
+    static let separator = NSColor(calibratedRed: 0.75, green: 0.78, blue: 0.80, alpha: 1)
+
+    static let titleFont = NSFont.systemFont(ofSize: 30, weight: .bold)
+    static let subtitleFont = NSFont.systemFont(ofSize: 15, weight: .medium)
+    static let sectionFont = NSFont.systemFont(ofSize: 17, weight: .semibold)
+    static let bodyFont = NSFont.systemFont(ofSize: 14, weight: .regular)
+    static let emphasisFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
+
+    static var bodyAttributes: [NSAttributedString.Key: Any] {
+        [
+            .font: bodyFont,
+            .foregroundColor: primaryText,
+            .paragraphStyle: bodyParagraphStyle,
+        ]
+    }
+
+    static var bodyParagraphStyle: NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = 3
+        style.paragraphSpacing = 4
+        return style
+    }
+
+    static var titleParagraphStyle: NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacing = 4
+        return style
+    }
+
+    static var subtitleParagraphStyle: NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacing = 18
+        return style
+    }
+
+    static var sectionParagraphStyle: NSParagraphStyle {
+        let style = NSMutableParagraphStyle()
+        style.paragraphSpacingBefore = 12
+        style.paragraphSpacing = 2
+        return style
+    }
 }

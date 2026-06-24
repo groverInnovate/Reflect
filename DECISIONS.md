@@ -83,3 +83,11 @@ Kept the working text-tab dashboard and improved only the pure replay insight mo
 ## 2026-06-24 - Professionalize dashboard around daily learning
 
 Reduced the visible dashboard to Daily Review, Activity Timeline, and Focus Breaks so it teaches what happened instead of exposing debug surfaces. Added a ranked activity breakdown and explicit drift-alert status; the alternative was a redesigned native/card dashboard, but the stable AppKit text dashboard is the safer base after recent crashes.
+
+## 2026-06-24 - Treat Mac sleep as idle time
+
+Added macOS sleep/wake observers that write idle start/end events around lid-close or system sleep. This prevents the previous frontmost app from appearing to run through sleep; the alternative was to infer sleep from long timestamp gaps, which would be less reliable and harder to explain.
+
+## 2026-06-24 - Polish dashboard visually without changing its architecture
+
+Styled the stable AppKit dashboard with richer typography, calmer report backgrounds, and color-coded productivity/distraction cues. The alternative was a larger custom card UI, but the recent crash history makes an incremental rich-text design safer while still improving readability.

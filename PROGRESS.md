@@ -104,3 +104,6 @@
 - Added ranked activity breakdowns so the dashboard answers where time went, including productive, study/research, coding/tooling, distracting/wasted, and idle time.
 - Added clearer drift-prevention copy that explains whether notifications can interrupt future focus breaks.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added macOS sleep/wake observers so closing the Mac lid records an idle interval instead of stretching the previous app session through sleep.
+- Polished the stable dashboard with larger typography, warmer report background, and color-coded productive/distracting/idle/status lines.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

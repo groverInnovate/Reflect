@@ -11,7 +11,7 @@ final class MacActivityCollector {
     private let onEvent: (ActivityEvent) -> Void
     private let browserDomainReader = BrowserDomainReader()
     private let windowTitleReader = WindowTitleReader()
-    private var observer: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
     private var timer: Timer?
     private var isIdle = false
     private var frontmostBundleIdentifier: String?
@@ -29,7 +29,7 @@ final class MacActivityCollector {
         guard !isRunning else { return }
         isRunning = true
 
-        observer = NSWorkspace.shared.notificationCenter.addObserver(
+        let activationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
@@ -50,6 +50,29 @@ final class MacActivityCollector {
                 )
             }
         }
+        observers.append(activationObserver)
+
+        let sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.recordSystemSleep()
+            }
+        }
+        observers.append(sleepObserver)
+
+        let wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.recordSystemWake()
+            }
+        }
+        observers.append(wakeObserver)
 
         timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -73,10 +96,10 @@ final class MacActivityCollector {
         guard isRunning else { return }
         isRunning = false
 
-        if let observer {
+        for observer in observers {
             NSWorkspace.shared.notificationCenter.removeObserver(observer)
-            self.observer = nil
         }
+        observers.removeAll()
         timer?.invalidate()
         timer = nil
         isIdle = false
@@ -125,6 +148,30 @@ final class MacActivityCollector {
         }
 
         _ = recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: Date())
+    }
+
+    private func recordSystemSleep() {
+        guard !isIdle else { return }
+        isIdle = true
+        onEvent(ActivityEvent(timestamp: Date(), kind: .idleStart, appName: "Mac sleep"))
+        logger.info("Idle started because macOS is going to sleep")
+    }
+
+    private func recordSystemWake() {
+        guard isIdle else { return }
+        isIdle = false
+        let timestamp = Date()
+        onEvent(ActivityEvent(timestamp: timestamp, kind: .idleEnd, appName: "Mac wake"))
+        logger.info("Idle ended because macOS woke")
+
+        if let app = NSWorkspace.shared.frontmostApplication {
+            recordApplication(
+                bundleIdentifier: app.bundleIdentifier,
+                appName: app.localizedName,
+                processIdentifier: app.processIdentifier,
+                timestamp: timestamp
+            )
+        }
     }
 
     private func secondsSinceRecentInput() -> TimeInterval {
