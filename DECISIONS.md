@@ -95,3 +95,7 @@ Styled the stable AppKit dashboard with richer typography, calmer report backgro
 ## 2026-06-24 - Add real-time focus protection before daily drift review
 
 Added a pure `FocusProtectionEngine` that fires when a distracting app/domain follows a sustained productive block, then wired it to immediate local notifications with a 10-minute cooldown. The alternative was waiting for end-of-day drift analysis only, but the product needs to interrupt distractions while they are happening.
+
+## 2026-06-24 - Use window titles for study/research classification
+
+Expanded category matching to include window titles alongside domains, bundle IDs, and app names, then seeded more docs/course/research defaults. The alternative was relying only on app/domain, which misses common study cases like lecture PDFs opened in Preview.

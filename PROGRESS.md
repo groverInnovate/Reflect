@@ -111,3 +111,6 @@
 - Wired focus protection into live collection with a 10-minute notification cooldown so it can interrupt distractions without spamming.
 - Added synthetic tests for focus-protection alerts and short-block suppression.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 13 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Expanded category matching to include window titles, improving study/research detection for lecture PDFs and similar materials.
+- Added productive defaults for docs/course/research surfaces such as Google Docs, developer docs, docs.rs, arXiv, Overleaf, Coursera, edX, and PDF/lecture/course titles.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

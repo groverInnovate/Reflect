@@ -20,6 +20,19 @@ public enum DefaultAppCategories {
         .init("com.usebruno.app", "Bruno", .productive),
         .init("md.obsidian", "Obsidian", .productive),
         .init("notion.so", "Notion", .productive),
+        .init("docs.google.com", "Google Docs", .productive),
+        .init("drive.google.com", "Google Drive", .productive),
+        .init("developer.apple.com", "Apple Developer Docs", .productive),
+        .init("docs.rs", "Rust Docs", .productive),
+        .init("stackoverflow.com", "Stack Overflow", .productive),
+        .init("arxiv.org", "Research Papers", .productive),
+        .init("overleaf.com", "Overleaf", .productive),
+        .init("coursera.org", "Coursera", .productive),
+        .init("edx.org", "edX", .productive),
+        .init("khanacademy.org", "Khan Academy", .productive),
+        .init("lecture", "Lecture", .productive),
+        .init("course", "Course", .productive),
+        .init(".pdf", "PDF Reading", .productive),
     ]
 
     public static let neutral: [AppCategorySeed] = [
@@ -61,13 +74,8 @@ public struct CategoryResolver: Sendable {
     }
 
     public func category(for event: ActivityEvent) -> FocusCategory {
-        guard let key = event.browserDomain ?? event.appBundleID ?? event.appName else {
-            return .neutral
-        }
-
-        let normalizedKey = key.lowercased()
         return seeds.first { seed in
-            normalizedKey.contains(seed.matchPattern.lowercased())
+            searchableText(for: event).contains(seed.matchPattern.lowercased())
         }?.category ?? .neutral
     }
 
@@ -79,5 +87,16 @@ public struct CategoryResolver: Sendable {
             return appName
         }
         return event.appBundleID ?? "Unknown"
+    }
+
+    private func searchableText(for event: ActivityEvent) -> String {
+        [
+            event.browserDomain,
+            event.appBundleID,
+            event.appName,
+            event.windowTitle,
+        ]
+        .compactMap { $0?.lowercased() }
+        .joined(separator: " ")
     }
 }
