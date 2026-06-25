@@ -116,3 +116,7 @@
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added a dashboard-level "Refresh Today's Review" button that regenerates the daily replay and shows the last updated time.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added fallback sleep detection from long collector timer gaps, covering cases where macOS sleep/wake notifications are missed.
+- Replay timeline generation now removes idle intervals from active app blocks, so sleep/idle is not double-counted as productive time in the dashboard.
+- Added a regression test for idle overlap in replay blocks.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 16 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

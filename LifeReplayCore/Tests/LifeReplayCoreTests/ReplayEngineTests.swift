@@ -71,6 +71,30 @@ struct ReplayEngineTests {
         #expect(blocks.contains { $0.label == "Idle period" && $0.start == start.addingTimeInterval(900) })
     }
 
+    @Test("idle time is not double counted inside productive timeline blocks")
+    func idleTimeIsSubtractedFromSessionBlocks() {
+        let start = Date(timeIntervalSince1970: 0)
+        let sessions = [
+            FocusSession(start: start, end: start.addingTimeInterval(1_800), category: .productive, primaryAppName: "VS Code"),
+        ]
+        let events = [
+            ActivityEvent(timestamp: start.addingTimeInterval(600), kind: .idleStart),
+            ActivityEvent(timestamp: start.addingTimeInterval(1_200), kind: .idleEnd),
+        ]
+
+        let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(1_800))
+        let productiveMinutes = blocks
+            .filter { $0.category == .productive }
+            .reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) }
+        let idleMinutes = blocks
+            .filter { $0.label == "Idle period" }
+            .reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) }
+
+        #expect(blocks.count == 3)
+        #expect(productiveMinutes == 20)
+        #expect(idleMinutes == 10)
+    }
+
     @Test("insight report turns timeline blocks into journal metrics")
     func insightReportBuildsJournalMetrics() {
         let start = Date(timeIntervalSince1970: 0)

@@ -103,3 +103,7 @@ Expanded category matching to include window titles alongside domains, bundle ID
 ## 2026-06-24 - Put review regeneration inside the dashboard
 
 Added a native dashboard refresh button that regenerates today's replay and shows the updated time. The alternative was keeping generation only in the menu bar, but the review action belongs next to the report the user is reading.
+
+## 2026-06-25 - Infer sleep from collector suspension gaps
+
+Added a fallback for cases where macOS sleep/wake notifications are missed: if the collector's idle timer resumes after a long gap, it records the missing interval as idle/away. Also changed replay generation to cut idle intervals out of active session blocks, preventing Code or any other app from visually counting through sleep.

@@ -20,8 +20,9 @@ public struct ReplayEngine: Sendable {
     }
 
     public func timelineBlocks(from sessions: [FocusSession], events: [ActivityEvent], now: Date = Date()) -> [TimelineBlock] {
-        let sessionBlocks = sessionBlocks(from: sessions)
-        let idleBlocks = idleTimelineBlocks(from: events, now: now)
+        let idleIntervals = idleIntervals(from: events, now: now)
+        let sessionBlocks = sessionBlocks(from: sessions, excluding: idleIntervals)
+        let idleBlocks = idleTimelineBlocks(from: idleIntervals)
         return mergeBlocks((sessionBlocks + idleBlocks).sorted { $0.start < $1.start })
     }
 
@@ -40,10 +41,57 @@ public struct ReplayEngine: Sendable {
             .sorted { $0.start < $1.start }
     }
 
-    private func idleTimelineBlocks(from events: [ActivityEvent], now: Date) -> [TimelineBlock] {
+    private func sessionBlocks(
+        from sessions: [FocusSession],
+        excluding idleIntervals: [(start: Date, end: Date)]
+    ) -> [TimelineBlock] {
+        sessions
+            .flatMap { session -> [TimelineBlock] in
+                guard let end = session.end, end > session.start else { return [] }
+                return activeIntervals(from: session.start, to: end, excluding: idleIntervals).map { interval in
+                    TimelineBlock(
+                        start: interval.start,
+                        end: interval.end,
+                        label: session.primaryAppName ?? label(for: session.category),
+                        category: session.category,
+                        detail: nil
+                    )
+                }
+            }
+            .sorted { $0.start < $1.start }
+    }
+
+    private func activeIntervals(
+        from start: Date,
+        to end: Date,
+        excluding idleIntervals: [(start: Date, end: Date)]
+    ) -> [(start: Date, end: Date)] {
+        var intervals = [(start: start, end: end)]
+
+        for idle in idleIntervals {
+            intervals = intervals.flatMap { active in
+                let overlapStart = max(active.start, idle.start)
+                let overlapEnd = min(active.end, idle.end)
+                guard overlapEnd > overlapStart else { return [active] }
+
+                var remaining: [(start: Date, end: Date)] = []
+                if active.start < overlapStart {
+                    remaining.append((active.start, overlapStart))
+                }
+                if overlapEnd < active.end {
+                    remaining.append((overlapEnd, active.end))
+                }
+                return remaining
+            }
+        }
+
+        return intervals.filter { $0.end > $0.start }
+    }
+
+    private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
         let ordered = events.sorted { $0.timestamp < $1.timestamp }
         var idleStart: Date?
-        var blocks: [TimelineBlock] = []
+        var intervals: [(start: Date, end: Date)] = []
 
         for event in ordered {
             switch event.kind {
@@ -51,13 +99,7 @@ public struct ReplayEngine: Sendable {
                 idleStart = event.timestamp
             case .idleEnd:
                 if let start = idleStart, event.timestamp > start {
-                    blocks.append(TimelineBlock(
-                        start: start,
-                        end: event.timestamp,
-                        label: "Idle period",
-                        category: .neutral,
-                        detail: "No keyboard or mouse input"
-                    ))
+                    intervals.append((start, event.timestamp))
                 }
                 idleStart = nil
             case .appActivated, .browserDomain:
@@ -66,16 +108,22 @@ public struct ReplayEngine: Sendable {
         }
 
         if let start = idleStart, now > start {
-            blocks.append(TimelineBlock(
-                start: start,
-                end: now,
+            intervals.append((start, now))
+        }
+
+        return intervals
+    }
+
+    private func idleTimelineBlocks(from intervals: [(start: Date, end: Date)]) -> [TimelineBlock] {
+        intervals.map { interval in
+            TimelineBlock(
+                start: interval.start,
+                end: interval.end,
                 label: "Idle period",
                 category: .neutral,
                 detail: "No keyboard or mouse input"
-            ))
+            )
         }
-
-        return blocks
     }
 
     private func mergeBlocks(_ sortedBlocks: [TimelineBlock]) -> [TimelineBlock] {

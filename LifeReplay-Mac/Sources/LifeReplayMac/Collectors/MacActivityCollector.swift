@@ -8,6 +8,8 @@ import OSLog
 final class MacActivityCollector {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "ActivityCollector")
     private let idleThreshold: TimeInterval
+    private let timerInterval: TimeInterval = 15
+    private let suspensionGapThreshold: TimeInterval
     private let onEvent: (ActivityEvent) -> Void
     private let browserDomainReader = BrowserDomainReader()
     private let windowTitleReader = WindowTitleReader()
@@ -17,11 +19,13 @@ final class MacActivityCollector {
     private var frontmostBundleIdentifier: String?
     private var lastBrowserDomain: String?
     private var lastBrowserDomainBundleID: String?
+    private var lastIdlePollAt: Date?
 
     private(set) var isRunning = false
 
     init(idleThreshold: TimeInterval = 90, onEvent: @escaping (ActivityEvent) -> Void) {
         self.idleThreshold = idleThreshold
+        self.suspensionGapThreshold = max(5 * 60, idleThreshold * 2)
         self.onEvent = onEvent
     }
 
@@ -74,7 +78,8 @@ final class MacActivityCollector {
         }
         observers.append(wakeObserver)
 
-        timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+        lastIdlePollAt = Date()
+        timer = Timer.scheduledTimer(withTimeInterval: timerInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.pollIdleState()
             }
@@ -106,6 +111,7 @@ final class MacActivityCollector {
         frontmostBundleIdentifier = nil
         lastBrowserDomain = nil
         lastBrowserDomainBundleID = nil
+        lastIdlePollAt = nil
 
         logger.info("Mac activity collector stopped")
     }
@@ -136,18 +142,37 @@ final class MacActivityCollector {
     }
 
     private func pollIdleState() {
+        let now = Date()
+        recordSuspensionGapIfNeeded(now: now)
+        lastIdlePollAt = now
+
         let seconds = secondsSinceRecentInput()
         if seconds >= idleThreshold, !isIdle {
             isIdle = true
-            onEvent(ActivityEvent(timestamp: Date(), kind: .idleStart))
+            onEvent(ActivityEvent(timestamp: now, kind: .idleStart))
             logger.info("Idle started after \(seconds, format: .fixed(precision: 1)) seconds")
         } else if seconds < idleThreshold, isIdle {
             isIdle = false
-            onEvent(ActivityEvent(timestamp: Date(), kind: .idleEnd))
+            onEvent(ActivityEvent(timestamp: now, kind: .idleEnd))
             logger.info("Idle ended")
         }
 
-        _ = recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: Date())
+        _ = recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: now)
+    }
+
+    private func recordSuspensionGapIfNeeded(now: Date) {
+        guard let lastIdlePollAt else { return }
+        let elapsed = now.timeIntervalSince(lastIdlePollAt)
+        guard elapsed >= suspensionGapThreshold else { return }
+
+        let inferredStart = lastIdlePollAt.addingTimeInterval(idleThreshold)
+        guard inferredStart < now else { return }
+
+        if !isIdle {
+            onEvent(ActivityEvent(timestamp: inferredStart, kind: .idleStart, appName: "Mac sleep"))
+            onEvent(ActivityEvent(timestamp: now, kind: .idleEnd, appName: "Mac wake"))
+            logger.info("Recorded inferred sleep/away interval after timer gap of \(elapsed, format: .fixed(precision: 1)) seconds")
+        }
     }
 
     private func recordSystemSleep() {
