@@ -120,3 +120,6 @@
 - Replay timeline generation now removes idle intervals from active app blocks, so sleep/idle is not double-counted as productive time in the dashboard.
 - Added a regression test for idle overlap in replay blocks.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 16 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added dashboard data-quality warnings for suspiciously long uninterrupted active blocks and long tracked days with no idle.
+- Added a regression test for suspicious long-block warnings.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 17 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

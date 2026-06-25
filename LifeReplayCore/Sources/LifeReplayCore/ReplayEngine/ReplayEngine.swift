@@ -172,6 +172,7 @@ public struct ReplayEngine: Sendable {
         let fragmentedProductiveMinutes = fragmentedProductiveMinutes(in: blocks)
         let topProductiveLabels = topLabels(for: .productive, in: blocks)
         let topActivities = activityBreakdown(from: blocks)
+        let dataQualityWarnings = dataQualityWarnings(blocks: blocks)
         let observations = observations(
             focusScore: focusScore,
             productiveMinutes: productiveMinutes,
@@ -226,6 +227,7 @@ public struct ReplayEngine: Sendable {
             topActivities: topActivities,
             topProductiveLabels: topProductiveLabels,
             topDistractions: topDistractions,
+            dataQualityWarnings: dataQualityWarnings,
             observations: observations,
             nextAction: nextAction,
             journalSummary: summary
@@ -370,6 +372,32 @@ public struct ReplayEngine: Sendable {
             .map {
                 ActivityBreakdownItem(label: $0.label, category: $0.category, minutes: $0.minutes)
             }
+    }
+
+    private func dataQualityWarnings(blocks: [TimelineBlock]) -> [String] {
+        var warnings: [String] = []
+
+        let longestActiveBlock = blocks
+            .filter { $0.label != "Idle period" }
+            .max { lhs, rhs in
+                lhs.end.timeIntervalSince(lhs.start) < rhs.end.timeIntervalSince(rhs.start)
+            }
+
+        if let longestActiveBlock, minutes(in: longestActiveBlock) >= 6 * 60 {
+            warnings.append(
+                "\(longestActiveBlock.label) spans \(formatMinutes(minutes(in: longestActiveBlock))) without an idle split. If the Mac slept during that time, keep this build running so the new sleep-gap detector can correct it."
+            )
+        }
+
+        let totalMinutes = blocks.reduce(0) { $0 + minutes(in: $1) }
+        let idleMinutes = blocks
+            .filter { $0.label == "Idle period" }
+            .reduce(0) { $0 + minutes(in: $1) }
+        if totalMinutes >= 8 * 60, idleMinutes == 0 {
+            warnings.append("No idle/away time was recorded across a long tracked day; this may mean the app was not running through sleep/wake yet.")
+        }
+
+        return warnings
     }
 
     private func observations(
@@ -537,6 +565,7 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var topActivities: [ActivityBreakdownItem]
     public var topProductiveLabels: [String]
     public var topDistractions: [String]
+    public var dataQualityWarnings: [String]
     public var observations: [String]
     public var nextAction: String
     public var journalSummary: String

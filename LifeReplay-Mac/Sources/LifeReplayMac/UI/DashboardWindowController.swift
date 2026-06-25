@@ -179,6 +179,15 @@ final class DashboardWindowController: NSWindowController {
             lines += insights.topActivities.map(renderActivityLine)
         }
 
+        if !insights.dataQualityWarnings.isEmpty {
+            lines += [
+                "",
+                "Accuracy Notes",
+                "--------------",
+            ]
+            lines += insights.dataQualityWarnings.map { "Check: \($0)" }
+        }
+
         lines += [
             "",
             "Focus Story",
@@ -414,7 +423,7 @@ final class DashboardWindowController: NSWindowController {
 
         if line.contains("Productive") || line.contains("strong day") {
             attributes[.foregroundColor] = DashboardStyle.productiveText
-        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") {
+        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") {
             attributes[.foregroundColor] = DashboardStyle.distractingText
         } else if line.contains("Idle") || line.contains("Neutral") {
             attributes[.foregroundColor] = DashboardStyle.neutralText
@@ -429,6 +438,7 @@ final class DashboardWindowController: NSWindowController {
     private func isSectionHeader(line: String) -> Bool {
         [
             "Where Time Went",
+            "Accuracy Notes",
             "Focus Story",
             "Journal",
             "What To Do Next",

@@ -107,3 +107,7 @@ Added a native dashboard refresh button that regenerates today's replay and show
 ## 2026-06-25 - Infer sleep from collector suspension gaps
 
 Added a fallback for cases where macOS sleep/wake notifications are missed: if the collector's idle timer resumes after a long gap, it records the missing interval as idle/away. Also changed replay generation to cut idle intervals out of active session blocks, preventing Code or any other app from visually counting through sleep.
+
+## 2026-06-25 - Surface suspicious tracking data in the dashboard
+
+Added data-quality warnings for suspiciously long uninterrupted active blocks or long days with no idle. The alternative was silently showing questionable numbers; the dashboard should teach Mohit when a number may be wrong as well as what the number is.

@@ -157,4 +157,21 @@ struct ReplayEngineTests {
         #expect(report.journalSummary.contains("productive"))
         #expect(report.journalSummary.contains("Distracting/wasted"))
     }
+
+    @Test("insight report warns about suspiciously long active blocks")
+    func insightReportWarnsAboutLongUnsplitBlocks() {
+        let start = Date(timeIntervalSince1970: 0)
+        let blocks = [
+            TimelineBlock(
+                start: start,
+                end: start.addingTimeInterval(7 * 3_600),
+                label: "VS Code",
+                category: .productive
+            ),
+        ]
+
+        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
+
+        #expect(report.dataQualityWarnings.contains { $0.contains("VS Code") })
+    }
 }
