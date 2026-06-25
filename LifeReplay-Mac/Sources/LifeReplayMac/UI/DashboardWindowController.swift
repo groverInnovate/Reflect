@@ -216,6 +216,15 @@ final class DashboardWindowController: NSWindowController {
             lines.append("Use Repair Sleep Gaps if this warning came from Mac sleep or lid-close time.")
         }
 
+        if !insights.calibrationSuggestions.isEmpty {
+            lines += [
+                "",
+                "Calibration Suggestions",
+                "-----------------------",
+            ]
+            lines += insights.calibrationSuggestions.map { "Tune: \($0)" }
+        }
+
         lines += [
             "",
             "Focus Story",
@@ -453,6 +462,8 @@ final class DashboardWindowController: NSWindowController {
             attributes[.foregroundColor] = DashboardStyle.productiveText
         } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") {
             attributes[.foregroundColor] = DashboardStyle.distractingText
+        } else if line.hasPrefix("Tune:") {
+            attributes[.foregroundColor] = DashboardStyle.accentText
         } else if line.contains("Idle") || line.contains("Neutral") {
             attributes[.foregroundColor] = DashboardStyle.neutralText
         } else if line.contains("Focus Score") || line.contains("Tracked time") || line.contains("Notifications") {
@@ -468,6 +479,7 @@ final class DashboardWindowController: NSWindowController {
             "Where Time Went",
             "Accuracy Notes",
             "Today's Numbers",
+            "Calibration Suggestions",
             "Focus Story",
             "Journal",
             "What To Do Next",

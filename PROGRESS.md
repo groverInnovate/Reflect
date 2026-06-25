@@ -135,3 +135,6 @@
 - Added app-side automatic daily replay generation after 9:30 PM when the app is running.
 - Added a generated-review notification that includes the focus score.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added dashboard calibration suggestions for high neutral/unclassified time, repair needs, missing study detection, and missing distraction detection.
+- Added a regression test for high-neutral category calibration suggestions.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 20 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

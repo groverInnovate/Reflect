@@ -127,3 +127,7 @@ Added a clearer "Today's Numbers" section and explicit repair guidance under acc
 ## 2026-06-25 - Auto-generate evening reviews while the app is running
 
 Added an app-side timer that generates today's replay once per day after 9:30 PM and sends a ready notification with the focus score. The scheduled notification remains a fallback nudge; the timer makes the journal artifact exist before Mohit opens the dashboard.
+
+## 2026-06-25 - Add calibration suggestions to the daily review
+
+Added report-level suggestions for category tuning, repair, and missing distraction/study detection. The alternative was relying on Mohit to infer why numbers felt wrong, but the app should point to likely fixes after 1-2 days of use.

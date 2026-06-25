@@ -173,6 +173,16 @@ public struct ReplayEngine: Sendable {
         let topProductiveLabels = topLabels(for: .productive, in: blocks)
         let topActivities = activityBreakdown(from: blocks)
         let dataQualityWarnings = dataQualityWarnings(blocks: blocks)
+        let calibrationSuggestions = calibrationSuggestions(
+            totalMinutes: totalMinutes,
+            productiveMinutes: productiveMinutes,
+            studyMinutes: studyMinutes,
+            distractingMinutes: distractingMinutes,
+            neutralMinutes: neutralMinutes,
+            idleMinutes: idleMinutes,
+            topActivities: topActivities,
+            dataQualityWarnings: dataQualityWarnings
+        )
         let observations = observations(
             focusScore: focusScore,
             productiveMinutes: productiveMinutes,
@@ -228,6 +238,7 @@ public struct ReplayEngine: Sendable {
             topProductiveLabels: topProductiveLabels,
             topDistractions: topDistractions,
             dataQualityWarnings: dataQualityWarnings,
+            calibrationSuggestions: calibrationSuggestions,
             observations: observations,
             nextAction: nextAction,
             journalSummary: summary
@@ -400,6 +411,43 @@ public struct ReplayEngine: Sendable {
         return warnings
     }
 
+    private func calibrationSuggestions(
+        totalMinutes: Int,
+        productiveMinutes: Int,
+        studyMinutes: Int,
+        distractingMinutes: Int,
+        neutralMinutes: Int,
+        idleMinutes: Int,
+        topActivities: [ActivityBreakdownItem],
+        dataQualityWarnings: [String]
+    ) -> [String] {
+        var suggestions: [String] = []
+        let activeMinutes = max(0, totalMinutes - idleMinutes)
+
+        if !dataQualityWarnings.isEmpty {
+            suggestions.append("Run Repair Sleep Gaps before judging today's focus score.")
+        }
+
+        if activeMinutes > 0, Double(neutralMinutes) / Double(activeMinutes) >= 0.35 {
+            let neutralLabels = topActivities
+                .filter { $0.category == .neutral }
+                .prefix(3)
+                .map(\.label)
+            let suffix = neutralLabels.isEmpty ? "" : " Start with: \(neutralLabels.joined(separator: ", "))."
+            suggestions.append("A lot of active time is neutral/unclassified; edit categories to improve accuracy.\(suffix)")
+        }
+
+        if productiveMinutes >= 60, studyMinutes == 0 {
+            suggestions.append("No study/research time was detected inside a productive day; add category rules for your lecture, PDF, course, or notes tools if that is wrong.")
+        }
+
+        if distractingMinutes == 0, activeMinutes >= 4 * 60 {
+            suggestions.append("No distracting time was detected across a long active day; verify your distraction domains are categorized.")
+        }
+
+        return Array(suggestions.prefix(4))
+    }
+
     private func observations(
         focusScore: Int,
         productiveMinutes: Int,
@@ -566,6 +614,7 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var topProductiveLabels: [String]
     public var topDistractions: [String]
     public var dataQualityWarnings: [String]
+    public var calibrationSuggestions: [String]
     public var observations: [String]
     public var nextAction: String
     public var journalSummary: String

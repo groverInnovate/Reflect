@@ -174,4 +174,28 @@ struct ReplayEngineTests {
 
         #expect(report.dataQualityWarnings.contains { $0.contains("VS Code") })
     }
+
+    @Test("insight report suggests category calibration for high neutral time")
+    func insightReportSuggestsCategoryCalibration() {
+        let start = Date(timeIntervalSince1970: 0)
+        let blocks = [
+            TimelineBlock(
+                start: start,
+                end: start.addingTimeInterval(90 * 60),
+                label: "Unknown Research Tool",
+                category: .neutral
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(90 * 60),
+                end: start.addingTimeInterval(120 * 60),
+                label: "VS Code",
+                category: .productive
+            ),
+        ]
+
+        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 40)
+
+        #expect(report.calibrationSuggestions.contains { $0.contains("edit categories") })
+        #expect(report.calibrationSuggestions.contains { $0.contains("Unknown Research Tool") })
+    }
 }
