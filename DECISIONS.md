@@ -119,3 +119,7 @@ Added a repair engine and dashboard/menu actions that infer idle intervals acros
 ## 2026-06-25 - Schedule an end-of-day review reminder
 
 Added a repeating local notification at 9:30 PM so Life Replay nudges Mohit to review the day. The alternative was manual dashboard checking only, but the product goal is an evening journal habit, so the app should initiate that loop.
+
+## 2026-06-25 - Make repair guidance visible in the review
+
+Added a clearer "Today's Numbers" section and explicit repair guidance under accuracy warnings. The alternative was leaving repair discoverability to the menu, but warnings should point directly to the corrective action.

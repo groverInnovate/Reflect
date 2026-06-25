@@ -187,6 +187,8 @@ final class DashboardWindowController: NSWindowController {
             "Life Replay",
             "Daily Review - \(Date.now.formatted(date: .long, time: .omitted))",
             "",
+            "Today's Numbers",
+            "---------------",
             "Focus Score: \(insights.focusScore)/100 - \(focusQuality(insights.focusScore))",
             "Tracked time: \(formatMinutes(insights.totalTrackedMinutes))",
             "Productive: \(formatMinutes(insights.productiveMinutes))    Study/research: \(formatMinutes(insights.studyLikeMinutes))    Coding/tooling: \(formatMinutes(insights.codingLikeMinutes))",
@@ -211,6 +213,7 @@ final class DashboardWindowController: NSWindowController {
                 "--------------",
             ]
             lines += insights.dataQualityWarnings.map { "Check: \($0)" }
+            lines.append("Use Repair Sleep Gaps if this warning came from Mac sleep or lid-close time.")
         }
 
         lines += [
@@ -464,6 +467,7 @@ final class DashboardWindowController: NSWindowController {
         [
             "Where Time Went",
             "Accuracy Notes",
+            "Today's Numbers",
             "Focus Story",
             "Journal",
             "What To Do Next",

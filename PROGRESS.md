@@ -130,3 +130,5 @@
 - Added a repeating 9:30 PM local notification reminder to review the daily replay.
 - Added a menu action to reschedule the daily review reminder.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a clearer "Today's Numbers" section and repair guidance beneath dashboard accuracy warnings.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
