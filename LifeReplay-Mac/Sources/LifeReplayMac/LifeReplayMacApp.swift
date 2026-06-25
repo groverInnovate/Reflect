@@ -67,6 +67,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         configureStatusItem()
         notifications.requestAuthorizationIfNeeded()
+        notifications.scheduleDailyReviewReminder()
         if collectionEnabled {
             collector.start()
         }
@@ -105,6 +106,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: accessibilityTitle, action: #selector(requestAccessibility), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Notifications: \(notificationSummary.rawValue)", action: #selector(requestNotifications), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Send Test Notification", action: #selector(sendTestNotification), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Schedule Daily Review Reminder", action: #selector(scheduleDailyReviewReminder), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Capture Current Browser Tab", action: #selector(captureCurrentBrowserTab), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Show Permission Diagnostics", action: #selector(showPermissionDiagnostics), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Open Automation Settings", action: #selector(openAutomationSettings), keyEquivalent: ""))
@@ -338,6 +340,15 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func sendTestNotification() {
         notifications.sendTestNotification()
         updateNotificationSummary()
+    }
+
+    @objc private func scheduleDailyReviewReminder() {
+        notifications.scheduleDailyReviewReminder()
+        updateNotificationSummary()
+        let alert = NSAlert()
+        alert.messageText = "Daily Review Reminder Scheduled"
+        alert.informativeText = "Life Replay will remind you at 9:30 PM to review the day."
+        alert.runModal()
     }
 
     @objc private func captureCurrentBrowserTab() {

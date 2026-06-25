@@ -115,3 +115,7 @@ Added data-quality warnings for suspiciously long uninterrupted active blocks or
 ## 2026-06-25 - Add manual sleep-gap repair
 
 Added a repair engine and dashboard/menu actions that infer idle intervals across long unmarked event gaps, then regenerate today's replay. The alternative was asking Mohit to ignore bad historical days, but a personal journal needs a way to correct obvious capture failures.
+
+## 2026-06-25 - Schedule an end-of-day review reminder
+
+Added a repeating local notification at 9:30 PM so Life Replay nudges Mohit to review the day. The alternative was manual dashboard checking only, but the product goal is an evening journal habit, so the app should initiate that loop.

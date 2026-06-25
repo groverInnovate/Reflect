@@ -4,6 +4,7 @@ import OSLog
 import UserNotifications
 
 private let driftCategoryIdentifier = "FOCUS_DRIFT"
+private let dailyReviewCategoryIdentifier = "DAILY_REVIEW"
 private let snoozeActionIdentifier = "SNOOZE_15"
 private let dismissActionIdentifier = "DISMISS"
 
@@ -29,7 +30,7 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         guard Bundle.main.bundleURL.pathExtension == "app" else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.setNotificationCategories([Self.driftCategory()])
+        center.setNotificationCategories([Self.driftCategory(), Self.dailyReviewCategory()])
     }
 
     func authorizationSummary(completion: @escaping @MainActor (AuthorizationSummary) -> Void) {
@@ -124,6 +125,35 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         )
     }
 
+    func scheduleDailyReviewReminder(hour: Int = 21, minute: Int = 30) {
+        guard isBundledApp else {
+            logger.info("Daily review reminder skipped while running outside an app bundle")
+            return
+        }
+        requestAuthorizationIfNeeded()
+
+        let content = UNMutableNotificationContent()
+        content.title = "Your Life Replay is ready"
+        content.body = "Open the dashboard and review what actually happened today."
+        content.sound = .default
+        content.categoryIdentifier = dailyReviewCategoryIdentifier
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = hour
+        dateComponents.minute = minute
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: "daily-review-reminder",
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request) { [logger] error in
+            if let error {
+                logger.error("Failed to schedule daily review reminder: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     private func sendNotification(identifier: String, title: String, body: String, categoryIdentifier: String? = nil) {
         let content = UNMutableNotificationContent()
         content.title = title
@@ -186,6 +216,15 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         return UNNotificationCategory(
             identifier: driftCategoryIdentifier,
             actions: [snooze, dismiss],
+            intentIdentifiers: [],
+            options: []
+        )
+    }
+
+    private static func dailyReviewCategory() -> UNNotificationCategory {
+        UNNotificationCategory(
+            identifier: dailyReviewCategoryIdentifier,
+            actions: [],
             intentIdentifiers: [],
             options: []
         )

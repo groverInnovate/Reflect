@@ -127,3 +127,6 @@
 - Added dashboard and menu actions to repair today's sleep gaps, refresh analysis, and regenerate today's replay.
 - Added synthetic tests for repair insertion and duplicate-prevention.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added a repeating 9:30 PM local notification reminder to review the daily replay.
+- Added a menu action to reschedule the daily review reminder.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
