@@ -14,6 +14,7 @@ final class DashboardWindowController: NSWindowController {
     private let driftTextView = NSTextView()
     private let rawTextView = NSTextView()
     private let refreshButton = NSButton(title: "Refresh Today's Review", target: nil, action: nil)
+    private let repairButton = NSButton(title: "Repair Sleep Gaps", target: nil, action: nil)
     private let reviewStatusLabel = NSTextField(labelWithString: "")
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -80,11 +81,17 @@ final class DashboardWindowController: NSWindowController {
         refreshButton.bezelStyle = .rounded
         refreshButton.controlSize = .large
 
+        repairButton.target = self
+        repairButton.action = #selector(repairSleepGaps)
+        repairButton.bezelStyle = .rounded
+        repairButton.controlSize = .large
+
         reviewStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
         reviewStatusLabel.textColor = DashboardStyle.secondaryText
         reviewStatusLabel.lineBreakMode = .byTruncatingTail
 
         headerView.addArrangedSubview(refreshButton)
+        headerView.addArrangedSubview(repairButton)
         headerView.addArrangedSubview(reviewStatusLabel)
         headerView.setHuggingPriority(.defaultLow, for: .horizontal)
         reviewStatusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -109,6 +116,7 @@ final class DashboardWindowController: NSWindowController {
 
     @objc private func refreshTodayReview() {
         refreshButton.isEnabled = false
+        repairButton.isEnabled = false
         reviewStatusLabel.stringValue = "Generating today's review..."
         Task { @MainActor in
             let replay = await store.generateDailyReplayWithNarrative()
@@ -116,8 +124,25 @@ final class DashboardWindowController: NSWindowController {
                 "Updated \($0.generatedAt.formatted(date: .omitted, time: .shortened))"
             } ?? "Could not generate review"
             refreshButton.isEnabled = true
+            repairButton.isEnabled = true
             reload()
         }
+    }
+
+    @objc private func repairSleepGaps() {
+        refreshButton.isEnabled = false
+        repairButton.isEnabled = false
+        reviewStatusLabel.stringValue = "Repairing suspicious gaps..."
+
+        let result = store.repairTodaySleepGaps()
+        if result.repairedIntervals == 0 {
+            reviewStatusLabel.stringValue = "No repairable gaps found"
+        } else {
+            reviewStatusLabel.stringValue = "Repaired \(result.repairedIntervals) gap\(result.repairedIntervals == 1 ? "" : "s")"
+        }
+        refreshButton.isEnabled = true
+        repairButton.isEnabled = true
+        reload()
     }
 
     private func tab(title: String, textView: NSTextView) -> NSTabViewItem {

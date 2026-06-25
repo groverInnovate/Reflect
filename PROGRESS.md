@@ -123,3 +123,7 @@
 - Added dashboard data-quality warnings for suspiciously long uninterrupted active blocks and long tracked days with no idle.
 - Added a regression test for suspicious long-block warnings.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 17 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added `ActivityRepairEngine` to infer idle intervals across long unmarked gaps.
+- Added dashboard and menu actions to repair today's sleep gaps, refresh analysis, and regenerate today's replay.
+- Added synthetic tests for repair insertion and duplicate-prevention.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

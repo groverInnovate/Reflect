@@ -111,3 +111,7 @@ Added a fallback for cases where macOS sleep/wake notifications are missed: if t
 ## 2026-06-25 - Surface suspicious tracking data in the dashboard
 
 Added data-quality warnings for suspiciously long uninterrupted active blocks or long days with no idle. The alternative was silently showing questionable numbers; the dashboard should teach Mohit when a number may be wrong as well as what the number is.
+
+## 2026-06-25 - Add manual sleep-gap repair
+
+Added a repair engine and dashboard/menu actions that infer idle intervals across long unmarked event gaps, then regenerate today's replay. The alternative was asking Mohit to ignore bad historical days, but a personal journal needs a way to correct obvious capture failures.

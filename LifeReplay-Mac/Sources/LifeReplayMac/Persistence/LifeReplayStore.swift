@@ -40,6 +40,11 @@ struct FocusProtectionAlert {
     }
 }
 
+struct RepairResult {
+    var insertedEvents: Int
+    var repairedIntervals: Int
+}
+
 private struct ConfigurationExport: Codable {
     var exportedAt: Date
     var categories: [CategoryExport]
@@ -137,6 +142,32 @@ final class LifeReplayStore {
         }
 
         return generated
+    }
+
+    func repairTodaySleepGaps(now: Date = Date()) -> RepairResult {
+        let settings = focusSettings()
+        let repairs = ActivityRepairEngine(configuration: ActivityRepairConfiguration(
+            minimumGapToRepair: max(30 * 60, settings.idleThresholdSeconds * 4),
+            idleStartOffset: settings.idleThresholdSeconds
+        )).inferredIdleEvents(from: eventsForToday(now: now))
+
+        guard !repairs.isEmpty else {
+            return RepairResult(insertedEvents: 0, repairedIntervals: 0)
+        }
+
+        for event in repairs {
+            context.insert(event)
+        }
+
+        do {
+            try context.save()
+            _ = refreshTodayAnalysis(now: now)
+            _ = generateDailyReplay(now: now)
+            return RepairResult(insertedEvents: repairs.count, repairedIntervals: repairs.count / 2)
+        } catch {
+            logger.error("Failed to repair sleep gaps: \(error.localizedDescription, privacy: .public)")
+            return RepairResult(insertedEvents: 0, repairedIntervals: 0)
+        }
     }
 
     private func replaySnapshot(now: Date) -> ReplaySnapshot {

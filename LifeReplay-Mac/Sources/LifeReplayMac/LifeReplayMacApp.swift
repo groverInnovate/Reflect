@@ -93,6 +93,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Replay History", action: #selector(openReplayHistory), keyEquivalent: "h"))
         menu.addItem(NSMenuItem(title: "Weekly Rollup", action: #selector(openWeeklyRollup), keyEquivalent: "w"))
         menu.addItem(NSMenuItem(title: "Generate Daily Replay", action: #selector(generateDailyReplay), keyEquivalent: "r"))
+        menu.addItem(NSMenuItem(title: "Repair Today's Sleep Gaps", action: #selector(repairTodaySleepGaps), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Backfill Recent Replays", action: #selector(backfillRecentReplays), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Export Daily Replay...", action: #selector(exportDailyReplay), keyEquivalent: "e"))
         menu.addItem(NSMenuItem(title: "Export Debug CSVs...", action: #selector(exportDebugCSVs), keyEquivalent: ""))
@@ -230,6 +231,22 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             dashboard?.reload()
             updateMenu()
         }
+    }
+
+    @objc private func repairTodaySleepGaps() {
+        guard let store else { return }
+        let result = store.repairTodaySleepGaps()
+        dashboard?.reload()
+        replayHistoryWindow?.reload()
+        weeklyRollupWindow?.reload()
+        updateMenu()
+
+        let alert = NSAlert()
+        alert.messageText = "Sleep Gap Repair"
+        alert.informativeText = result.repairedIntervals == 0
+            ? "No repairable sleep/away gaps were found for today."
+            : "Inserted \(result.insertedEvents) inferred idle event\(result.insertedEvents == 1 ? "" : "s") across \(result.repairedIntervals) gap\(result.repairedIntervals == 1 ? "" : "s")."
+        alert.runModal()
     }
 
     @objc private func backfillRecentReplays() {
