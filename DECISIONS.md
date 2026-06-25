@@ -123,3 +123,7 @@ Added a repeating local notification at 9:30 PM so Life Replay nudges Mohit to r
 ## 2026-06-25 - Make repair guidance visible in the review
 
 Added a clearer "Today's Numbers" section and explicit repair guidance under accuracy warnings. The alternative was leaving repair discoverability to the menu, but warnings should point directly to the corrective action.
+
+## 2026-06-25 - Auto-generate evening reviews while the app is running
+
+Added an app-side timer that generates today's replay once per day after 9:30 PM and sends a ready notification with the focus score. The scheduled notification remains a fallback nudge; the timer makes the journal artifact exist before Mohit opens the dashboard.

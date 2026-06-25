@@ -7,6 +7,7 @@ import OSLog
 final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private enum DefaultsKey {
         static let collectionEnabled = "collectionEnabled"
+        static let lastAutomaticReviewDate = "lastAutomaticReviewDate"
     }
 
     private let logger = Logger(subsystem: "LifeReplayMac", category: "App")
@@ -21,6 +22,8 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var dataStatusWindow: DataStatusWindowController?
     private var replayHistoryWindow: ReplayHistoryWindowController?
     private var weeklyRollupWindow: WeeklyRollupWindowController?
+    private var dailyReviewTimer: Timer?
+    private var isGeneratingAutomaticReview = false
     private var eventCount = 0
     private var lastFocusProtectionNotificationAt: Date?
     private let focusProtectionCooldown: TimeInterval = 10 * 60
@@ -68,6 +71,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         configureStatusItem()
         notifications.requestAuthorizationIfNeeded()
         notifications.scheduleDailyReviewReminder()
+        startDailyReviewAutomation()
         if collectionEnabled {
             collector.start()
         }
@@ -128,6 +132,47 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.notificationSummary = summary
             self?.updateMenu()
         }
+    }
+
+    private func startDailyReviewAutomation() {
+        dailyReviewTimer?.invalidate()
+        maybeGenerateAutomaticDailyReview()
+        dailyReviewTimer = Timer.scheduledTimer(withTimeInterval: 5 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.maybeGenerateAutomaticDailyReview()
+            }
+        }
+    }
+
+    private func maybeGenerateAutomaticDailyReview(now: Date = Date()) {
+        guard !isGeneratingAutomaticReview, let store else { return }
+        guard shouldGenerateAutomaticDailyReview(now: now) else { return }
+        guard !store.eventsForToday(now: now).isEmpty else { return }
+
+        isGeneratingAutomaticReview = true
+        Task { @MainActor in
+            let replay = await store.generateDailyReplayWithNarrative(now: now)
+            if let replay {
+                UserDefaults.standard.set(dayKey(for: now), forKey: DefaultsKey.lastAutomaticReviewDate)
+                notifications.notifyDailyReviewReady(focusScore: replay.focusScore)
+                dashboard?.reload()
+                replayHistoryWindow?.reload()
+                weeklyRollupWindow?.reload()
+                updateMenu()
+            }
+            isGeneratingAutomaticReview = false
+        }
+    }
+
+    private func shouldGenerateAutomaticDailyReview(now: Date) -> Bool {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: now)
+        let minutesSinceMidnight = (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        guard minutesSinceMidnight >= (21 * 60 + 30) else { return false }
+        return UserDefaults.standard.string(forKey: DefaultsKey.lastAutomaticReviewDate) != dayKey(for: now)
+    }
+
+    private func dayKey(for date: Date) -> String {
+        Calendar.current.startOfDay(for: date).formatted(.iso8601.year().month().day())
     }
 
     private func maybeSendFocusProtectionAlert(for event: ActivityEvent) {

@@ -154,6 +154,21 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         }
     }
 
+    func notifyDailyReviewReady(focusScore: Int) {
+        guard isBundledApp else {
+            logger.info("Daily review ready notification skipped while running outside an app bundle")
+            return
+        }
+        requestAuthorizationIfNeeded()
+
+        sendNotification(
+            identifier: "daily-review-ready-\(Date().timeIntervalSince1970)",
+            title: "Today's Life Replay is ready",
+            body: "Focus score: \(focusScore)/100. Open the dashboard for the day review.",
+            categoryIdentifier: dailyReviewCategoryIdentifier
+        )
+    }
+
     private func sendNotification(identifier: String, title: String, body: String, categoryIdentifier: String? = nil) {
         let content = UNMutableNotificationContent()
         content.title = title
