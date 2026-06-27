@@ -8,7 +8,7 @@ import OSLog
 final class MacActivityCollector {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "ActivityCollector")
     private let idleThreshold: TimeInterval
-    private let timerInterval: TimeInterval = 15
+    private let timerInterval: TimeInterval = 5
     private let suspensionGapThreshold: TimeInterval
     private let onEvent: (ActivityEvent) -> Void
     private let browserDomainReader = BrowserDomainReader()

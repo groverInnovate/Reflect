@@ -4,8 +4,8 @@ import Testing
 
 @Suite("Replay engine")
 struct ReplayEngineTests {
-    @Test("merges adjacent blocks of same category under gap threshold")
-    func mergesAdjacentBlocks() {
+    @Test("keeps adjacent blocks with different labels separate")
+    func keepsDifferentLabelsSeparate() {
         let start = Date(timeIntervalSince1970: 0)
         let sessions = [
             FocusSession(start: start, end: start.addingTimeInterval(600), category: .productive, primaryAppName: "VS Code"),
@@ -15,9 +15,10 @@ struct ReplayEngineTests {
 
         let blocks = ReplayEngine().timelineBlocks(from: sessions)
 
-        #expect(blocks.count == 2)
+        #expect(blocks.count == 3)
         #expect(blocks[0].category == .productive)
-        #expect(blocks[0].end == start.addingTimeInterval(1200))
+        #expect(blocks[0].label == "VS Code")
+        #expect(blocks[1].label == "Terminal")
     }
 
     @Test("fallback summary names longest productive block")
@@ -93,6 +94,34 @@ struct ReplayEngineTests {
         #expect(blocks.count == 3)
         #expect(productiveMinutes == 20)
         #expect(idleMinutes == 10)
+    }
+
+    @Test("browser domain intervals are allocated by observed active tab")
+    func browserDomainIntervalsUseObservedActiveTab() {
+        let start = Date(timeIntervalSince1970: 0)
+        let sessions = [
+            FocusSession(start: start, end: start.addingTimeInterval(89 * 60), category: .neutral, primaryAppName: "chatgpt.com"),
+        ]
+        let events = [
+            ActivityEvent(timestamp: start, kind: .browserDomain, browserDomain: "chatgpt.com"),
+            ActivityEvent(timestamp: start.addingTimeInterval(15 * 60), kind: .browserDomain, browserDomain: "rust-book.cs.brown.edu"),
+            ActivityEvent(timestamp: start.addingTimeInterval(89 * 60), kind: .idleStart),
+        ]
+
+        let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(89 * 60))
+
+        #expect(blocks.contains(TimelineBlock(
+            start: start,
+            end: start.addingTimeInterval(15 * 60),
+            label: "chatgpt.com",
+            category: .neutral
+        )))
+        #expect(blocks.contains(TimelineBlock(
+            start: start.addingTimeInterval(15 * 60),
+            end: start.addingTimeInterval(89 * 60),
+            label: "rust-book.cs.brown.edu",
+            category: .productive
+        )))
     }
 
     @Test("insight report turns timeline blocks into journal metrics")

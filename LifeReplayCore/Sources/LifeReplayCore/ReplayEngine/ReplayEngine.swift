@@ -20,8 +20,18 @@ public struct ReplayEngine: Sendable {
     }
 
     public func timelineBlocks(from sessions: [FocusSession], events: [ActivityEvent], now: Date = Date()) -> [TimelineBlock] {
+        timelineBlocks(from: sessions, events: events, resolver: .init(), now: now)
+    }
+
+    public func timelineBlocks(
+        from sessions: [FocusSession],
+        events: [ActivityEvent],
+        resolver: CategoryResolver,
+        now: Date = Date()
+    ) -> [TimelineBlock] {
         let idleIntervals = idleIntervals(from: events, now: now)
-        let sessionBlocks = sessionBlocks(from: sessions, excluding: idleIntervals)
+        let activeBlocks = eventTimelineBlocks(from: events, idleIntervals: idleIntervals, resolver: resolver, now: now)
+        let sessionBlocks = activeBlocks.isEmpty ? sessionBlocks(from: sessions, excluding: idleIntervals) : activeBlocks
         let idleBlocks = idleTimelineBlocks(from: idleIntervals)
         return mergeBlocks((sessionBlocks + idleBlocks).sorted { $0.start < $1.start })
     }
@@ -88,6 +98,34 @@ public struct ReplayEngine: Sendable {
         return intervals.filter { $0.end > $0.start }
     }
 
+    private func eventTimelineBlocks(
+        from events: [ActivityEvent],
+        idleIntervals: [(start: Date, end: Date)],
+        resolver: CategoryResolver,
+        now: Date
+    ) -> [TimelineBlock] {
+        let meaningfulEvents = events
+            .filter { $0.kind == .appActivated || $0.kind == .browserDomain }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard !meaningfulEvents.isEmpty else { return [] }
+
+        return meaningfulEvents.enumerated().flatMap { index, event -> [TimelineBlock] in
+            let nextTimestamp = meaningfulEvents.dropFirst(index + 1).first?.timestamp ?? now
+            guard nextTimestamp > event.timestamp else { return [] }
+
+            return activeIntervals(from: event.timestamp, to: nextTimestamp, excluding: idleIntervals).map { interval in
+                TimelineBlock(
+                    start: interval.start,
+                    end: interval.end,
+                    label: resolver.displayName(for: event),
+                    category: resolver.category(for: event),
+                    detail: event.windowTitle
+                )
+            }
+        }
+        .sorted { $0.start < $1.start }
+    }
+
     private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
         let ordered = events.sorted { $0.timestamp < $1.timestamp }
         var idleStart: Date?
@@ -135,10 +173,10 @@ public struct ReplayEngine: Sendable {
 
             let gap = next.start.timeIntervalSince(previous.end)
             let overlaps = next.start < previous.end
-            if previous.category == next.category, gap <= configuration.mergeGap, !overlaps {
+            if previous.category == next.category, previous.label == next.label, gap <= configuration.mergeGap, !overlaps {
                 previous.end = max(previous.end, next.end)
-                if !previous.label.contains(next.label) {
-                    previous.detail = [previous.detail, next.label].compactMap(\.self).joined(separator: ", ")
+                if let detail = next.detail, previous.detail != detail {
+                    previous.detail = [previous.detail, detail].compactMap(\.self).joined(separator: ", ")
                 }
                 blocks[blocks.count - 1] = previous
             } else {
@@ -280,7 +318,7 @@ public struct ReplayEngine: Sendable {
     }
 
     private func studyLikeMinutes(in blocks: [TimelineBlock]) -> Int {
-        let studyTerms = ["obsidian", "notion", "reading", "lecture", "study", "pdf", "books", "research", "paper", "notes", "course", "docs"]
+        let studyTerms = ["obsidian", "notion", "reading", "lecture", "study", "pdf", "book", "books", "rust-book", "rust book", "research", "paper", "notes", "course", "docs"]
         return blocks.reduce(0) { total, block in
             let label = block.label.lowercased()
             let detail = block.detail?.lowercased() ?? ""

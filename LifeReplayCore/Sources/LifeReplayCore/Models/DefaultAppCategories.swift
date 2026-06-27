@@ -24,6 +24,8 @@ public enum DefaultAppCategories {
         .init("drive.google.com", "Google Drive", .productive),
         .init("developer.apple.com", "Apple Developer Docs", .productive),
         .init("docs.rs", "Rust Docs", .productive),
+        .init("rust-book.cs.brown.edu", "Rust Book", .productive),
+        .init("doc.rust-lang.org/book", "Rust Book", .productive),
         .init("stackoverflow.com", "Stack Overflow", .productive),
         .init("arxiv.org", "Research Papers", .productive),
         .init("overleaf.com", "Overleaf", .productive),

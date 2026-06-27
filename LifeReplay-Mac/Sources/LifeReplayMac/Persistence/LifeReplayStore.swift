@@ -174,7 +174,12 @@ final class LifeReplayStore {
         let events = eventsForToday(now: now)
         let analysis = makeFocusEngine().analyze(events: events, now: now)
         let replayEngine = ReplayEngine()
-        let blocks = replayEngine.timelineBlocks(from: analysis.sessions, events: events, now: now)
+        let blocks = replayEngine.timelineBlocks(
+            from: analysis.sessions,
+            events: events,
+            resolver: CategoryResolver(seeds: categorySeeds()),
+            now: now
+        )
         let fallbackSummary = replayEngine.fallbackSummary(
             blocks: blocks,
             driftEvents: analysis.driftEvents,

@@ -171,7 +171,12 @@ final class DashboardWindowController: NSWindowController {
     private func dashboardData() -> DashboardData {
         let events = store.eventsForToday()
         let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
-        let blocks = ReplayEngine().timelineBlocks(from: analysis.sessions, events: events, now: Date())
+        let blocks = ReplayEngine().timelineBlocks(
+            from: analysis.sessions,
+            events: events,
+            resolver: CategoryResolver(seeds: store.categorySeeds()),
+            now: Date()
+        )
         let savedReplay = store.existingDailyReplay()
         let insights = ReplayEngine().insightReport(
             blocks: blocks,

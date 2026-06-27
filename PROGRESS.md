@@ -138,3 +138,8 @@
 - Added dashboard calibration suggestions for high neutral/unclassified time, repair needs, missing study detection, and missing distraction detection.
 - Added a regression test for high-neutral category calibration suggestions.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 20 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Changed replay generation to build timeline blocks from observed event intervals, so different browser domains with the same category no longer collapse into one long mislabeled block.
+- Added Rust Book productive/study defaults for `rust-book.cs.brown.edu` and `doc.rust-lang.org/book`.
+- Reduced live browser/idle polling from 15 seconds to 5 seconds to catch tab switches sooner.
+- Added regression coverage for ChatGPT-to-Rust-Book browser intervals.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 21 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

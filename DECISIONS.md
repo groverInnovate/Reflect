@@ -131,3 +131,11 @@ Added an app-side timer that generates today's replay once per day after 9:30 PM
 ## 2026-06-25 - Add calibration suggestions to the daily review
 
 Added report-level suggestions for category tuning, repair, and missing distraction/study detection. The alternative was relying on Mohit to infer why numbers felt wrong, but the app should point to likely fixes after 1-2 days of use.
+
+## 2026-06-28 - Build replay from observed event intervals
+
+Changed replay timeline generation to allocate time from actual app/domain event intervals instead of broad focus sessions. This fixes cases where one neutral browser domain, like ChatGPT, swallowed time spent on another tab, like Rust Book; the alternative was more category tuning, but the underlying time allocation was too coarse.
+
+## 2026-06-28 - Poll browser tabs more frequently
+
+Reduced the collector timer from 15 seconds to 5 seconds so active-tab changes are detected closer to when they happen. The collector still only writes browser events when the domain changes, so this improves accuracy without storing duplicate rows every poll.

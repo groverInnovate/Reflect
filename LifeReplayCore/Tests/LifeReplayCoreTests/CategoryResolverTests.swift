@@ -40,6 +40,7 @@ struct CategoryResolverTests {
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .browserDomain, browserDomain: "arxiv.org"),
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 1), kind: .browserDomain, browserDomain: "coursera.org"),
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 2), kind: .browserDomain, browserDomain: "docs.rs"),
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 3), kind: .browserDomain, browserDomain: "rust-book.cs.brown.edu"),
         ]
 
         #expect(events.allSatisfy { resolver.category(for: $0) == .productive })
