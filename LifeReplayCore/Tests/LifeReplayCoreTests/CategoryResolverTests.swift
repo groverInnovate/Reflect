@@ -45,4 +45,30 @@ struct CategoryResolverTests {
 
         #expect(events.allSatisfy { resolver.category(for: $0) == .productive })
     }
+
+    @Test("default resolver classifies AI and HackMD work as productive")
+    func defaultResolverClassifiesAIAndHackMDWork() {
+        let resolver = CategoryResolver()
+        let events = [
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .appActivated, appName: "Claude"),
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 1), kind: .browserDomain, browserDomain: "chatgpt.com"),
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 2), kind: .browserDomain, browserDomain: "hackmd.io"),
+        ]
+
+        #expect(events.allSatisfy { resolver.category(for: $0) == .productive })
+    }
+
+    @Test("browser window title can provide a productive display name")
+    func browserTitleProvidesDisplayName() {
+        let resolver = CategoryResolver()
+        let event = ActivityEvent(
+            timestamp: Date(timeIntervalSince1970: 0),
+            kind: .appActivated,
+            appName: "Brave Browser",
+            windowTitle: "Week 2 - HackMD - Brave"
+        )
+
+        #expect(resolver.category(for: event) == .productive)
+        #expect(resolver.displayName(for: event) == "HackMD")
+    }
 }

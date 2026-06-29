@@ -114,7 +114,7 @@ struct ReplayEngineTests {
             start: start,
             end: start.addingTimeInterval(15 * 60),
             label: "chatgpt.com",
-            category: .neutral
+            category: .productive
         )))
         #expect(blocks.contains(TimelineBlock(
             start: start.addingTimeInterval(15 * 60),

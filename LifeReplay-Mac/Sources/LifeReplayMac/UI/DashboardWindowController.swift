@@ -302,10 +302,10 @@ final class DashboardWindowController: NSWindowController {
             "Activity Timeline",
             "Today - \(Date.now.formatted(date: .long, time: .omitted))",
             "-----------------",
-            "This is the compact replay of what the Mac observed today.",
+            "This is the compact replay of what the Mac observed today. Rapid sub-minute switches are grouped for readability.",
             "",
         ]
-        lines += blocks.map(renderBlock)
+        lines += compactTimelineForDisplay(blocks).map(renderBlock)
         return lines.joined(separator: "\n")
     }
 
@@ -351,6 +351,43 @@ final class DashboardWindowController: NSWindowController {
         let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
         let detail = block.detail.map { " - \($0)" } ?? ""
         return "\(start)-\(end)  \(formatMinutes(minutes))  \(categoryLabel(block.category))  \(block.label)\(detail)"
+    }
+
+    private func compactTimelineForDisplay(_ blocks: [TimelineBlock]) -> [TimelineBlock] {
+        var compacted: [TimelineBlock] = []
+        var microRun: [TimelineBlock] = []
+
+        func flushMicroRun() {
+            guard !microRun.isEmpty else { return }
+            if microRun.count == 1 {
+                compacted.append(microRun[0])
+            } else {
+                let labels = Array(Set(microRun.map(\.label))).sorted()
+                compacted.append(TimelineBlock(
+                    start: microRun[0].start,
+                    end: microRun[microRun.count - 1].end,
+                    label: "Mixed \(categoryLabel(microRun[0].category).lowercased()) activity",
+                    category: microRun[0].category,
+                    detail: labels.joined(separator: ", ")
+                ))
+            }
+            microRun.removeAll()
+        }
+
+        for block in blocks {
+            let duration = block.end.timeIntervalSince(block.start)
+            if duration < 60, block.label != "Idle period" {
+                if let last = microRun.last, last.category != block.category {
+                    flushMicroRun()
+                }
+                microRun.append(block)
+            } else {
+                flushMicroRun()
+                compacted.append(block)
+            }
+        }
+        flushMicroRun()
+        return compacted
     }
 
     private func renderDrift(_ drift: DriftEvent) -> String {

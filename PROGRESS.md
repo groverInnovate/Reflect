@@ -143,3 +143,8 @@
 - Reduced live browser/idle polling from 15 seconds to 5 seconds to catch tab switches sooner.
 - Added regression coverage for ChatGPT-to-Rust-Book browser intervals.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 21 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added productive defaults for Claude, ChatGPT, and HackMD.
+- Existing databases now backfill missing default category rules on launch while preserving user edits.
+- Browser app events can use window-title category matches for display names, so `Week 2 - HackMD - Brave` can show as HackMD when domain capture misses.
+- Activity Timeline now compacts rapid sub-minute switches into mixed activity rows for readability.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 23 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

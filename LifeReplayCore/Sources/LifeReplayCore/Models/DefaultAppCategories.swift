@@ -20,6 +20,12 @@ public enum DefaultAppCategories {
         .init("com.usebruno.app", "Bruno", .productive),
         .init("md.obsidian", "Obsidian", .productive),
         .init("notion.so", "Notion", .productive),
+        .init("claude", "Claude", .productive),
+        .init("anthropic", "Claude", .productive),
+        .init("chatgpt.com", "ChatGPT", .productive),
+        .init("chat.openai.com", "ChatGPT", .productive),
+        .init("hackmd.io", "HackMD", .productive),
+        .init("HackMD", "HackMD", .productive),
         .init("docs.google.com", "Google Docs", .productive),
         .init("drive.google.com", "Google Drive", .productive),
         .init("developer.apple.com", "Apple Developer Docs", .productive),
@@ -76,19 +82,37 @@ public struct CategoryResolver: Sendable {
     }
 
     public func category(for event: ActivityEvent) -> FocusCategory {
-        return seeds.first { seed in
-            searchableText(for: event).contains(seed.matchPattern.lowercased())
-        }?.category ?? .neutral
+        matchedSeed(for: event)?.category ?? .neutral
     }
 
     public func displayName(for event: ActivityEvent) -> String {
         if let domain = event.browserDomain, !domain.isEmpty {
             return domain
         }
+        if let seed = matchedSeed(for: event), shouldPreferCategoryDisplayName(for: event) {
+            return seed.displayName
+        }
         if let appName = event.appName, !appName.isEmpty {
             return appName
         }
         return event.appBundleID ?? "Unknown"
+    }
+
+    private func matchedSeed(for event: ActivityEvent) -> AppCategorySeed? {
+        let text = searchableText(for: event)
+        return seeds.first { seed in
+            text.contains(seed.matchPattern.lowercased())
+        }
+    }
+
+    private func shouldPreferCategoryDisplayName(for event: ActivityEvent) -> Bool {
+        guard event.browserDomain == nil else { return false }
+        let appName = event.appName?.lowercased() ?? ""
+        return appName.contains("brave")
+            || appName.contains("chrome")
+            || appName.contains("safari")
+            || appName.contains("edge")
+            || appName.contains("vivaldi")
     }
 
     private func searchableText(for event: ActivityEvent) -> String {

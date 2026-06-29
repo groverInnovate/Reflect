@@ -647,11 +647,13 @@ final class LifeReplayStore {
     }
 
     private func seedDefaultCategoriesIfNeeded() throws {
-        var descriptor = FetchDescriptor<AppCategory>()
-        descriptor.fetchLimit = 1
-        guard try context.fetch(descriptor).isEmpty else { return }
+        let existingPatterns = Set(categories().map { $0.matchPattern.lowercased() })
+        let missingSeeds = DefaultAppCategories.all.filter {
+            !existingPatterns.contains($0.matchPattern.lowercased())
+        }
+        guard !missingSeeds.isEmpty else { return }
 
-        for seed in DefaultAppCategories.all {
+        for seed in missingSeeds {
             context.insert(AppCategory(
                 matchPattern: seed.matchPattern,
                 displayName: seed.displayName,
@@ -659,7 +661,7 @@ final class LifeReplayStore {
             ))
         }
         try context.save()
-        logger.info("Seeded \(DefaultAppCategories.all.count) default app categories")
+        logger.info("Seeded \(missingSeeds.count) missing default app categories")
     }
 
     private func seedFocusSettingsIfNeeded() throws {

@@ -139,3 +139,11 @@ Changed replay timeline generation to allocate time from actual app/domain event
 ## 2026-06-28 - Poll browser tabs more frequently
 
 Reduced the collector timer from 15 seconds to 5 seconds so active-tab changes are detected closer to when they happen. The collector still only writes browser events when the domain changes, so this improves accuracy without storing duplicate rows every poll.
+
+## 2026-06-29 - Treat AI writing tools and HackMD as productive work
+
+Added Claude, ChatGPT, and HackMD to productive defaults, and made browser window titles contribute display names when domain capture misses. Existing installs now receive missing default rules on launch; the alternative was asking Mohit to hand-edit categories for common work tools.
+
+## 2026-06-29 - Compact noisy sub-minute timeline rows
+
+Grouped rapid sub-minute switches of the same category into mixed activity rows for dashboard readability. The raw events remain available in exports, but the review timeline should communicate work blocks instead of pages of 0-minute toggles.
