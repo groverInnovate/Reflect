@@ -16,7 +16,7 @@ struct CategoryResolverTests {
         )
 
         #expect(resolver.category(for: event) == .productive)
-        #expect(resolver.displayName(for: event) == "example.com")
+        #expect(resolver.displayName(for: event) == "Example Research")
     }
 
     @Test("default resolver uses window titles for study material")
@@ -70,5 +70,16 @@ struct CategoryResolverTests {
 
         #expect(resolver.category(for: event) == .productive)
         #expect(resolver.displayName(for: event) == "HackMD")
+    }
+
+    @Test("known domains use their category display names")
+    func knownDomainsUseDisplayNames() {
+        let resolver = CategoryResolver()
+        let events = [
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .browserDomain, browserDomain: "hackmd.io"),
+            ActivityEvent(timestamp: Date(timeIntervalSince1970: 1), kind: .browserDomain, browserDomain: "chatgpt.com"),
+        ]
+
+        #expect(events.map { resolver.displayName(for: $0) } == ["HackMD", "ChatGPT"])
     }
 }

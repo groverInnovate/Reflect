@@ -147,3 +147,11 @@ Added Claude, ChatGPT, and HackMD to productive defaults, and made browser windo
 ## 2026-06-29 - Compact noisy sub-minute timeline rows
 
 Grouped rapid sub-minute switches of the same category into mixed activity rows for dashboard readability. The raw events remain available in exports, but the review timeline should communicate work blocks instead of pages of 0-minute toggles.
+
+## 2026-06-30 - Count AI assistance inside nearby study workflows
+
+Changed study/research accounting so Claude/ChatGPT blocks count as study support when adjacent to study/notes tools such as HackMD. The alternative was counting only the frontmost surface, but split-screen workflows use multiple visible tools for one task.
+
+## 2026-06-30 - Show active observed time separately from idle
+
+Changed the dashboard headline from total tracked time to active observed time plus idle/away. The alternative made repaired overnight idle dominate the headline and made the useful work session harder to judge.

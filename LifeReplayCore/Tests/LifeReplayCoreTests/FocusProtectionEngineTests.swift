@@ -31,7 +31,7 @@ struct FocusProtectionEngineTests {
 
         let signal = FocusProtectionEngine().signal(for: trigger, events: events)
 
-        #expect(signal?.triggerName == "twitter.com")
+        #expect(signal?.triggerName == "Twitter / X")
         #expect(signal?.previousContext == "VS Code")
         #expect(signal?.productiveMinutes == 12)
     }

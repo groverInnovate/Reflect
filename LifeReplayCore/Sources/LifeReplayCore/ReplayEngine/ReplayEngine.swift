@@ -318,14 +318,44 @@ public struct ReplayEngine: Sendable {
     }
 
     private func studyLikeMinutes(in blocks: [TimelineBlock]) -> Int {
-        let studyTerms = ["obsidian", "notion", "reading", "lecture", "study", "pdf", "book", "books", "rust-book", "rust book", "research", "paper", "notes", "course", "docs"]
-        return blocks.reduce(0) { total, block in
-            let label = block.label.lowercased()
-            let detail = block.detail?.lowercased() ?? ""
-            guard block.category == .productive, studyTerms.contains(where: { label.contains($0) || detail.contains($0) }) else {
+        blocks.enumerated().reduce(0) { total, indexedBlock in
+            let index = indexedBlock.offset
+            let block = indexedBlock.element
+            guard block.category == .productive else {
                 return total
             }
+            guard isStudyLike(block) || isStudySupportBlock(block, at: index, in: blocks) else { return total }
             return total + minutes(in: block)
+        }
+    }
+
+    private func isStudyLike(_ block: TimelineBlock) -> Bool {
+        let studyTerms = [
+            "obsidian", "notion", "hackmd", "reading", "lecture", "study", "pdf", "book",
+            "books", "rust-book", "rust book", "research", "paper", "notes", "course", "docs"
+        ]
+        let label = block.label.lowercased()
+        let detail = block.detail?.lowercased() ?? ""
+        return studyTerms.contains { label.contains($0) || detail.contains($0) }
+    }
+
+    private func isStudySupportBlock(_ block: TimelineBlock, at index: Int, in blocks: [TimelineBlock]) -> Bool {
+        let supportTerms = ["claude", "chatgpt", "anthropic", "openai"]
+        let label = block.label.lowercased()
+        let detail = block.detail?.lowercased() ?? ""
+        guard supportTerms.contains(where: { label.contains($0) || detail.contains($0) }) else { return false }
+
+        let window: TimeInterval = 5 * 60
+        let neighbors = [
+            index > 0 ? blocks[index - 1] : nil,
+            index + 1 < blocks.count ? blocks[index + 1] : nil,
+        ].compactMap(\.self)
+
+        return neighbors.contains { neighbor in
+            guard neighbor.category == .productive, isStudyLike(neighbor) else { return false }
+            let gapBefore = max(0, block.start.timeIntervalSince(neighbor.end))
+            let gapAfter = max(0, neighbor.start.timeIntervalSince(block.end))
+            return min(gapBefore, gapAfter) <= window
         }
     }
 

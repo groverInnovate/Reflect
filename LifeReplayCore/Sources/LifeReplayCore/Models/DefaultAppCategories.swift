@@ -86,11 +86,11 @@ public struct CategoryResolver: Sendable {
     }
 
     public func displayName(for event: ActivityEvent) -> String {
+        if let seed = matchedSeed(for: event) {
+            return seed.displayName
+        }
         if let domain = event.browserDomain, !domain.isEmpty {
             return domain
-        }
-        if let seed = matchedSeed(for: event), shouldPreferCategoryDisplayName(for: event) {
-            return seed.displayName
         }
         if let appName = event.appName, !appName.isEmpty {
             return appName
@@ -103,16 +103,6 @@ public struct CategoryResolver: Sendable {
         return seeds.first { seed in
             text.contains(seed.matchPattern.lowercased())
         }
-    }
-
-    private func shouldPreferCategoryDisplayName(for event: ActivityEvent) -> Bool {
-        guard event.browserDomain == nil else { return false }
-        let appName = event.appName?.lowercased() ?? ""
-        return appName.contains("brave")
-            || appName.contains("chrome")
-            || appName.contains("safari")
-            || appName.contains("edge")
-            || appName.contains("vivaldi")
     }
 
     private func searchableText(for event: ActivityEvent) -> String {

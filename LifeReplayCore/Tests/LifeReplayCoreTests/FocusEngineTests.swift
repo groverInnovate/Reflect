@@ -20,7 +20,7 @@ struct FocusEngineTests {
         let analysis = engine.analyze(events: events)
 
         #expect(analysis.driftEvents.count == 1)
-        #expect(analysis.driftEvents[0].triggerAppNames.contains("twitter.com"))
+        #expect(analysis.driftEvents[0].triggerAppNames.contains("Twitter / X"))
         #expect(analysis.driftEvents[0].switchCountInWindow >= 4)
         #expect(analysis.driftEvents[0].timestamp == start.addingTimeInterval(6 * 60 + 30))
     }

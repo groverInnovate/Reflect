@@ -148,3 +148,8 @@
 - Browser app events can use window-title category matches for display names, so `Week 2 - HackMD - Brave` can show as HackMD when domain capture misses.
 - Activity Timeline now compacts rapid sub-minute switches into mixed activity rows for readability.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 23 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Claude/ChatGPT blocks adjacent to study/notes tools now count toward study/research as support work.
+- Known category matches now use display names like HackMD, ChatGPT, and Rust Book instead of splitting totals by raw domains.
+- Dashboard now shows active observed time separately from idle/away so repaired sleep does not dominate the main headline.
+- Added regression coverage for AI support inside a HackMD study workflow.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.

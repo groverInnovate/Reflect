@@ -113,13 +113,13 @@ struct ReplayEngineTests {
         #expect(blocks.contains(TimelineBlock(
             start: start,
             end: start.addingTimeInterval(15 * 60),
-            label: "chatgpt.com",
+            label: "ChatGPT",
             category: .productive
         )))
         #expect(blocks.contains(TimelineBlock(
             start: start.addingTimeInterval(15 * 60),
             end: start.addingTimeInterval(89 * 60),
-            label: "rust-book.cs.brown.edu",
+            label: "Rust Book",
             category: .productive
         )))
     }
@@ -226,5 +226,35 @@ struct ReplayEngineTests {
 
         #expect(report.calibrationSuggestions.contains { $0.contains("edit categories") })
         #expect(report.calibrationSuggestions.contains { $0.contains("Unknown Research Tool") })
+    }
+
+    @Test("AI support near notes counts as study workflow")
+    func aiSupportNearNotesCountsAsStudyWorkflow() {
+        let start = Date(timeIntervalSince1970: 0)
+        let blocks = [
+            TimelineBlock(
+                start: start,
+                end: start.addingTimeInterval(20 * 60),
+                label: "HackMD",
+                category: .productive
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(20 * 60),
+                end: start.addingTimeInterval(25 * 60),
+                label: "Claude",
+                category: .productive
+            ),
+            TimelineBlock(
+                start: start.addingTimeInterval(25 * 60),
+                end: start.addingTimeInterval(45 * 60),
+                label: "HackMD",
+                category: .productive
+            ),
+        ]
+
+        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 80)
+
+        #expect(report.productiveMinutes == 45)
+        #expect(report.studyLikeMinutes == 45)
     }
 }
