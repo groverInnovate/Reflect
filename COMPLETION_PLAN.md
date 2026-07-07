@@ -48,17 +48,17 @@ Primary references:
 
 - [x] Keep the Mac app stable on the existing AppKit text dashboard architecture.
 - [x] Add visible Tracking Health diagnostics to the Daily Review.
-- [ ] Keep tests and the script-built `.app` passing after every meaningful change.
-- [ ] Update README so the user can run, verify, export, and calibrate without
+- [x] Keep tests and the script-built `.app` passing after every meaningful change.
+- [x] Update README so the user can run, verify, export, and calibrate without
       remembering this chat.
-- [ ] Export enough debug data to diagnose inaccurate days without touching the
+- [x] Export enough debug data to diagnose inaccurate days without touching the
       database manually.
 
 ### P1 - Maximum User Benefit
 
 - [ ] Improve the Daily Review copy until it reads like a useful end-of-day journal:
       what happened, what mattered, what was suspicious, and tomorrow's one action.
-- [ ] Make calibration loops obvious: top neutral items should become suggested
+- [x] Make calibration loops obvious: top neutral items should become suggested
       category edits.
 - [ ] Add a final manual QA checklist for one real 90-minute work/study session.
 - [ ] Make README limitation language honest: Life Replay observes frontmost and
