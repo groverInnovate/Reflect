@@ -155,3 +155,11 @@ Changed study/research accounting so Claude/ChatGPT blocks count as study suppor
 ## 2026-06-30 - Show active observed time separately from idle
 
 Changed the dashboard headline from total tracked time to active observed time plus idle/away. The alternative made repaired overnight idle dominate the headline and made the useful work session harder to judge.
+
+## 2026-07-07 - Add a completion plan before final polish
+
+Created `COMPLETION_PLAN.md` to anchor the winding-down work around the daily review product promise, free-tier Apple constraints, and a final acceptance checklist. The alternative was to keep adding features opportunistically, but completion needs a visible product/technical bar.
+
+## 2026-07-07 - Surface tracking trust in the dashboard
+
+Added a Tracking Health section to Daily Review that checks event density, browser-domain capture, window-title coverage, idle markers, neutral share, and notifications. The alternative was to keep diagnostics in exports/status windows, but the user should know whether today's numbers are trustworthy before judging the day.

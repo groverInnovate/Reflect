@@ -183,7 +183,15 @@ final class DashboardWindowController: NSWindowController {
             driftEvents: analysis.driftEvents,
             focusScore: analysis.focusScore
         )
-        return DashboardData(events: events, analysis: analysis, blocks: blocks, savedReplay: savedReplay, insights: insights)
+        let health = trackingHealth(events: events, insights: insights)
+        return DashboardData(
+            events: events,
+            analysis: analysis,
+            blocks: blocks,
+            savedReplay: savedReplay,
+            insights: insights,
+            trackingHealth: health
+        )
     }
 
     private func renderDailyReview(_ data: DashboardData) -> String {
@@ -229,6 +237,16 @@ final class DashboardWindowController: NSWindowController {
             ]
             lines += insights.calibrationSuggestions.map { "Tune: \($0)" }
         }
+
+        lines += [
+            "",
+            "Tracking Health",
+            "---------------",
+            "Health: \(data.trackingHealth.confidence) - \(data.trackingHealth.summary)",
+            "Events today: \(data.trackingHealth.totalEvents)    Browser tab captures: \(data.trackingHealth.browserDomainEvents)    Window titles: \(data.trackingHealth.windowTitleEvents)",
+            "Last signal: \(data.trackingHealth.lastSignalText)",
+        ]
+        lines += data.trackingHealth.actions.map { "Action: \($0)" }
 
         lines += [
             "",
@@ -456,6 +474,116 @@ final class DashboardWindowController: NSWindowController {
         }
     }
 
+    private func trackingHealth(events: [ActivityEvent], insights: DailyInsightReport) -> TrackingHealthReport {
+        let activeObservedMinutes = max(0, insights.totalTrackedMinutes - insights.idleMinutes)
+        let activeEvents = events.filter { $0.kind == .appActivated || $0.kind == .browserDomain }
+        let browserDomainEvents = events.filter { $0.kind == .browserDomain }.count
+        let windowTitleEvents = events.filter { $0.windowTitle?.isEmpty == false }.count
+        let browserAppEvents = events.filter(isBrowserAppEvent).count
+        let idleStarts = events.filter { $0.kind == .idleStart }.count
+        let idleEnds = events.filter { $0.kind == .idleEnd }.count
+        let neutralShare = activeObservedMinutes == 0
+            ? 0
+            : Double(insights.neutralMinutes) / Double(max(1, activeObservedMinutes))
+        let lastEvent = events.last?.timestamp
+
+        var actions: [String] = []
+        var confidence = "Good"
+        var summary = "Tracking is healthy enough to judge the day."
+
+        if events.isEmpty {
+            confidence = "No data"
+            summary = "Life Replay has not captured activity today."
+            actions.append("Leave the menu bar app running during a real work or study session.")
+        }
+
+        if !permissions.isAccessibilityTrusted {
+            confidence = maxRisk(confidence, "Needs setup")
+            summary = "Window titles are missing, so notes, PDFs, and browser context may be under-labeled."
+            actions.append("Approve Accessibility for LifeReplayMac, then quit and reopen the app.")
+        }
+
+        if browserAppEvents > 0, browserDomainEvents == 0 {
+            confidence = maxRisk(confidence, "Needs setup")
+            summary = "A browser was visible, but active tab domains were not captured."
+            actions.append("Use Capture Current Browser Tab from the menu and approve the Automation prompt.")
+        }
+
+        if activeObservedMinutes >= 60, activeEvents.count < 8 {
+            confidence = maxRisk(confidence, "Low")
+            summary = "The day has a long active block with very few switching signals."
+            actions.append("Keep the app running continuously; if the Mac slept, run Repair Sleep Gaps.")
+        }
+
+        if neutralShare >= 0.35 {
+            confidence = maxRisk(confidence, "Medium")
+            summary = "A large share of visible time is neutral or unclassified."
+            actions.append("Open Edit Categories and classify the top neutral apps/domains from Where Time Went.")
+        }
+
+        if idleStarts != idleEnds {
+            confidence = maxRisk(confidence, "Medium")
+            summary = "An idle interval is still open or partially repaired."
+            actions.append("Refresh after you return, or use Repair Sleep Gaps if this came from lid-close time.")
+        }
+
+        switch notificationSummary {
+        case .denied:
+            confidence = maxRisk(confidence, "Medium")
+            actions.append("Enable notifications so drift protection can interrupt distractions in real time.")
+        case .unavailable:
+            actions.append("Use the signed .app bundle for notification and permission testing.")
+        default:
+            break
+        }
+
+        if !insights.dataQualityWarnings.isEmpty {
+            confidence = maxRisk(confidence, "Medium")
+        }
+
+        if actions.isEmpty {
+            actions.append("No immediate calibration needed. Review the timeline against your memory tonight.")
+        }
+
+        return TrackingHealthReport(
+            confidence: confidence,
+            summary: summary,
+            totalEvents: events.count,
+            browserDomainEvents: browserDomainEvents,
+            windowTitleEvents: windowTitleEvents,
+            lastSignalText: lastEvent.map(relativeSignalText) ?? "none today",
+            actions: Array(actions.prefix(4))
+        )
+    }
+
+    private func isBrowserAppEvent(_ event: ActivityEvent) -> Bool {
+        let candidates = [
+            event.appName,
+            event.appBundleID,
+            event.windowTitle,
+        ].compactMap { $0?.lowercased() }
+        let browserTerms = ["safari", "chrome", "brave", "edge", "vivaldi", "firefox", "arc"]
+        return candidates.contains { value in
+            browserTerms.contains { value.contains($0) }
+        }
+    }
+
+    private func relativeSignalText(_ date: Date) -> String {
+        let seconds = max(0, Int(Date().timeIntervalSince(date)))
+        if seconds < 60 {
+            return "just now"
+        }
+        if seconds < 60 * 60 {
+            return "\(seconds / 60)m ago"
+        }
+        return "\(seconds / 3600)h \((seconds % 3600) / 60)m ago"
+    }
+
+    private func maxRisk(_ current: String, _ candidate: String) -> String {
+        let order = ["Good": 0, "Medium": 1, "Low": 2, "Needs setup": 3, "No data": 4]
+        return (order[candidate, default: 0] > order[current, default: 0]) ? candidate : current
+    }
+
     private func applyStyledReport(_ report: String, to textView: NSTextView) {
         let styled = NSMutableAttributedString()
         let lines = report.components(separatedBy: "\n")
@@ -502,9 +630,9 @@ final class DashboardWindowController: NSWindowController {
 
         if line.contains("Productive") || line.contains("strong day") {
             attributes[.foregroundColor] = DashboardStyle.productiveText
-        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") {
+        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") || line.contains("Needs setup") || line.contains("Low") {
             attributes[.foregroundColor] = DashboardStyle.distractingText
-        } else if line.hasPrefix("Tune:") {
+        } else if line.hasPrefix("Tune:") || line.hasPrefix("Action:") || line.contains("Health:") {
             attributes[.foregroundColor] = DashboardStyle.accentText
         } else if line.contains("Idle") || line.contains("Neutral") {
             attributes[.foregroundColor] = DashboardStyle.neutralText
@@ -522,6 +650,7 @@ final class DashboardWindowController: NSWindowController {
             "Accuracy Notes",
             "Today's Numbers",
             "Calibration Suggestions",
+            "Tracking Health",
             "Focus Story",
             "Journal",
             "What To Do Next",
@@ -538,6 +667,17 @@ private struct DashboardData {
     var blocks: [TimelineBlock]
     var savedReplay: DailyReplay?
     var insights: DailyInsightReport
+    var trackingHealth: TrackingHealthReport
+}
+
+private struct TrackingHealthReport {
+    var confidence: String
+    var summary: String
+    var totalEvents: Int
+    var browserDomainEvents: Int
+    var windowTitleEvents: Int
+    var lastSignalText: String
+    var actions: [String]
 }
 
 @MainActor

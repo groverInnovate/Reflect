@@ -153,3 +153,7 @@
 - Dashboard now shows active observed time separately from idle/away so repaired sleep does not dominate the main headline.
 - Added regression coverage for AI support inside a HackMD study workflow.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Researched the current Apple free-tier capability boundary and captured the winding-down backlog in `COMPLETION_PLAN.md`.
+- Added a Daily Review Tracking Health section that explains event density, browser tab capture, window-title capture, idle/sleep markers, neutral-category risk, notification readiness, and the next calibration action.
+- Updated `README.md` with the final run path, accuracy judgment loop, calibration workflow, split-screen/frontmost limitation, and debug export guidance.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
