@@ -163,3 +163,7 @@ Created `COMPLETION_PLAN.md` to anchor the winding-down work around the daily re
 ## 2026-07-07 - Surface tracking trust in the dashboard
 
 Added a Tracking Health section to Daily Review that checks event density, browser-domain capture, window-title coverage, idle markers, neutral share, and notifications. The alternative was to keep diagnostics in exports/status windows, but the user should know whether today's numbers are trustworthy before judging the day.
+
+## 2026-07-07 - Turn neutral time into category fixes
+
+Added Category Fix Candidates to the Daily Review so neutral app/domain time produces concrete rule patterns to review. The alternative was a vague "edit categories" hint, but accuracy improves fastest when the app points at the exact unlabeled surfaces.

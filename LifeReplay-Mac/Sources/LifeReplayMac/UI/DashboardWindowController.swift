@@ -171,10 +171,11 @@ final class DashboardWindowController: NSWindowController {
     private func dashboardData() -> DashboardData {
         let events = store.eventsForToday()
         let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
+        let resolver = CategoryResolver(seeds: store.categorySeeds())
         let blocks = ReplayEngine().timelineBlocks(
             from: analysis.sessions,
             events: events,
-            resolver: CategoryResolver(seeds: store.categorySeeds()),
+            resolver: resolver,
             now: Date()
         )
         let savedReplay = store.existingDailyReplay()
@@ -184,13 +185,15 @@ final class DashboardWindowController: NSWindowController {
             focusScore: analysis.focusScore
         )
         let health = trackingHealth(events: events, insights: insights)
+        let categoryCandidates = categoryFixCandidates(events: events, resolver: resolver)
         return DashboardData(
             events: events,
             analysis: analysis,
             blocks: blocks,
             savedReplay: savedReplay,
             insights: insights,
-            trackingHealth: health
+            trackingHealth: health,
+            categoryCandidates: categoryCandidates
         )
     }
 
@@ -247,6 +250,15 @@ final class DashboardWindowController: NSWindowController {
             "Last signal: \(data.trackingHealth.lastSignalText)",
         ]
         lines += data.trackingHealth.actions.map { "Action: \($0)" }
+
+        if !data.categoryCandidates.isEmpty {
+            lines += [
+                "",
+                "Category Fix Candidates",
+                "-----------------------",
+            ]
+            lines += data.categoryCandidates.map(renderCategoryCandidate)
+        }
 
         lines += [
             "",
@@ -584,6 +596,59 @@ final class DashboardWindowController: NSWindowController {
         return (order[candidate, default: 0] > order[current, default: 0]) ? candidate : current
     }
 
+    private func categoryFixCandidates(events: [ActivityEvent], resolver: CategoryResolver) -> [CategoryFixCandidate] {
+        let meaningfulEvents = events
+            .filter { $0.kind == .appActivated || $0.kind == .browserDomain }
+            .sorted { $0.timestamp < $1.timestamp }
+        guard meaningfulEvents.count >= 2 else { return [] }
+
+        var totals: [String: CategoryFixCandidate] = [:]
+
+        for (index, event) in meaningfulEvents.enumerated() {
+            guard resolver.category(for: event) == .neutral else { continue }
+            let nextTimestamp = index + 1 < meaningfulEvents.count ? meaningfulEvents[index + 1].timestamp : Date()
+            let minutes = max(0, Int(nextTimestamp.timeIntervalSince(event.timestamp) / 60))
+            guard minutes > 0, let pattern = candidatePattern(for: event) else { continue }
+
+            let key = pattern.lowercased()
+            let label = resolver.displayName(for: event)
+            if var existing = totals[key] {
+                existing.minutes += minutes
+                totals[key] = existing
+            } else {
+                totals[key] = CategoryFixCandidate(pattern: pattern, label: label, minutes: minutes)
+            }
+        }
+
+        return totals.values
+            .sorted { lhs, rhs in
+                if lhs.minutes == rhs.minutes { return lhs.label < rhs.label }
+                return lhs.minutes > rhs.minutes
+            }
+            .prefix(4)
+            .map { $0 }
+    }
+
+    private func candidatePattern(for event: ActivityEvent) -> String? {
+        if let domain = event.browserDomain, !domain.isEmpty {
+            return domain
+        }
+        if let bundleID = event.appBundleID, !bundleID.isEmpty {
+            return bundleID
+        }
+        if let appName = event.appName, !appName.isEmpty {
+            return appName
+        }
+        if let title = event.windowTitle, !title.isEmpty {
+            return title
+        }
+        return nil
+    }
+
+    private func renderCategoryCandidate(_ candidate: CategoryFixCandidate) -> String {
+        "Review: \(formatMinutes(candidate.minutes)) as \(candidate.label) - add rule pattern `\(candidate.pattern)` if this should be productive or distracting."
+    }
+
     private func applyStyledReport(_ report: String, to textView: NSTextView) {
         let styled = NSMutableAttributedString()
         let lines = report.components(separatedBy: "\n")
@@ -632,7 +697,7 @@ final class DashboardWindowController: NSWindowController {
             attributes[.foregroundColor] = DashboardStyle.productiveText
         } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") || line.contains("Needs setup") || line.contains("Low") {
             attributes[.foregroundColor] = DashboardStyle.distractingText
-        } else if line.hasPrefix("Tune:") || line.hasPrefix("Action:") || line.contains("Health:") {
+        } else if line.hasPrefix("Tune:") || line.hasPrefix("Action:") || line.hasPrefix("Review:") || line.contains("Health:") {
             attributes[.foregroundColor] = DashboardStyle.accentText
         } else if line.contains("Idle") || line.contains("Neutral") {
             attributes[.foregroundColor] = DashboardStyle.neutralText
@@ -651,6 +716,7 @@ final class DashboardWindowController: NSWindowController {
             "Today's Numbers",
             "Calibration Suggestions",
             "Tracking Health",
+            "Category Fix Candidates",
             "Focus Story",
             "Journal",
             "What To Do Next",
@@ -668,6 +734,7 @@ private struct DashboardData {
     var savedReplay: DailyReplay?
     var insights: DailyInsightReport
     var trackingHealth: TrackingHealthReport
+    var categoryCandidates: [CategoryFixCandidate]
 }
 
 private struct TrackingHealthReport {
@@ -678,6 +745,12 @@ private struct TrackingHealthReport {
     var windowTitleEvents: Int
     var lastSignalText: String
     var actions: [String]
+}
+
+private struct CategoryFixCandidate {
+    var pattern: String
+    var label: String
+    var minutes: Int
 }
 
 @MainActor

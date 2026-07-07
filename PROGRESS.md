@@ -157,3 +157,5 @@
 - Added a Daily Review Tracking Health section that explains event density, browser tab capture, window-title capture, idle/sleep markers, neutral-category risk, notification readiness, and the next calibration action.
 - Updated `README.md` with the final run path, accuracy judgment loop, calibration workflow, split-screen/frontmost limitation, and debug export guidance.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- Added Category Fix Candidates to the Daily Review so top neutral app/domain patterns can be quickly classified through Edit Categories.
+- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
