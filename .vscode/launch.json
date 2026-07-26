@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Life_Replay}",
+            "name": "Debug LifeReplayMac",
+            "target": "LifeReplayMac",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug LifeReplayMac"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Life_Replay}",
+            "name": "Release LifeReplayMac",
+            "target": "LifeReplayMac",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release LifeReplayMac"
+        }
+    ]
+}
