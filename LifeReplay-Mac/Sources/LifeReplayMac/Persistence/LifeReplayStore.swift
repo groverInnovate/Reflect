@@ -3,13 +3,6 @@ import LifeReplayCore
 import OSLog
 import SwiftData
 
-private typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
-private typealias CoreAppCategory = LifeReplayCore.AppCategory
-private typealias CoreFocusSession = LifeReplayCore.FocusSession
-private typealias CoreDriftEvent = LifeReplayCore.DriftEvent
-private typealias CoreDailyReplay = LifeReplayCore.DailyReplay
-private typealias CoreFocusSettings = LifeReplayCore.FocusSettings
-
 private struct ReplaySnapshot {
     var analysis: FocusAnalysis
     var blocks: [TimelineBlock]

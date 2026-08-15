@@ -6,13 +6,13 @@ import SwiftData
 // out of LifeReplayCore makes the timeline and scoring engines testable with
 // the command-line Swift toolchain, without weakening the on-device store.
 
-private typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
-private typealias CoreAppCategory = LifeReplayCore.AppCategory
-private typealias CoreFocusSession = LifeReplayCore.FocusSession
-private typealias CoreDriftEvent = LifeReplayCore.DriftEvent
-private typealias CoreHealthSnapshot = LifeReplayCore.HealthSnapshot
-private typealias CoreDailyReplay = LifeReplayCore.DailyReplay
-private typealias CoreFocusSettings = LifeReplayCore.FocusSettings
+typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
+typealias CoreAppCategory = LifeReplayCore.AppCategory
+typealias CoreFocusSession = LifeReplayCore.FocusSession
+typealias CoreDriftEvent = LifeReplayCore.DriftEvent
+typealias CoreHealthSnapshot = LifeReplayCore.HealthSnapshot
+typealias CoreDailyReplay = LifeReplayCore.DailyReplay
+typealias CoreFocusSettings = LifeReplayCore.FocusSettings
 
 @Model
 final class ActivityEvent {

@@ -4,8 +4,6 @@ import Foundation
 import LifeReplayCore
 import OSLog
 
-private typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
-
 @MainActor
 final class MacActivityCollector {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "ActivityCollector")

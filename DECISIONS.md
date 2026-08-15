@@ -199,3 +199,7 @@ Core source changes were checked by inspection and a standalone synthetic smoke 
 ## 2026-08-15 - Preserve same-app task context changes
 
 Replay merging now keeps adjacent blocks separate when their Accessibility window titles differ, even when the app and category are the same. This lets the timeline distinguish project/file work inside VS Code or Xcode while still merging stable heartbeat rows. The alternative preserved minutes but hid task boundaries in a comma-separated detail string.
+
+## 2026-08-15 - Keep persistence bridge types visible to the Mac target
+
+The SwiftData conversion aliases are module-visible in the Mac target rather than private, because internal model initializers and store APIs use them in their signatures. This is a compiler-level boundary requirement; hiding the aliases produced access-control errors once SwiftData macro diagnostics were reached.
