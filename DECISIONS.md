@@ -203,3 +203,7 @@ Replay merging now keeps adjacent blocks separate when their Accessibility windo
 ## 2026-08-15 - Keep persistence bridge types visible to the Mac target
 
 The SwiftData conversion aliases are module-visible in the Mac target rather than private, because internal model initializers and store APIs use them in their signatures. This is a compiler-level boundary requirement; hiding the aliases produced access-control errors once SwiftData macro diagnostics were reached.
+
+## 2026-08-15 - Make accuracy the first mentor action
+
+When at least 30 minutes is unobserved, the journal’s next action tells the user to fix collection or permissions before changing their behavior. The alternative was motivational advice based on an incomplete day, which violates the mentor promise and can train the user to distrust the score.

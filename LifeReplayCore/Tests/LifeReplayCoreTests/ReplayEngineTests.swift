@@ -167,6 +167,7 @@ struct ReplayEngineTests {
         #expect(report.productiveMinutes == 2)
         #expect(report.unobservedMinutes == 58)
         #expect(report.journalSummary.contains("unobserved"))
+        #expect(report.nextAction.contains("fix collection"))
     }
 
     @Test("insight report turns timeline blocks into journal metrics")

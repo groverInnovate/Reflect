@@ -216,6 +216,7 @@ public struct ReplayEngine: Sendable {
             productiveMinutes: productiveMinutes,
             deepWorkMinutes: deepWorkMinutes,
             distractingMinutes: distractingMinutes,
+            unobservedMinutes: unobservedMinutes,
             driftEvents: driftEvents,
             topDistractions: topDistractions
         )
@@ -617,16 +618,20 @@ public struct ReplayEngine: Sendable {
             ? " \(formatMinutes(unobservedMinutes)) was unobserved and excluded from the score."
             : ""
 
-        return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(codingText)\(distractionText)\(driftText)\(bestBlock)\(idleText)\(unobservedText) Focus score: \(focusScore)/100. Next: \(nextAction)"
+        return "Life Replay observed \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(codingText)\(distractionText)\(driftText)\(bestBlock)\(idleText)\(unobservedText) Focus score: \(focusScore)/100. Next: \(nextAction)"
     }
 
     private func nextAction(
         productiveMinutes: Int,
         deepWorkMinutes: Int,
         distractingMinutes: Int,
+        unobservedMinutes: Int,
         driftEvents: [DriftEvent],
         topDistractions: [String]
     ) -> String {
+        if unobservedMinutes >= 30 {
+            return "fix collection or permissions before judging the score; \(formatMinutes(unobservedMinutes)) was not assigned to any surface."
+        }
         if productiveMinutes == 0 {
             return "start with one 45-minute work or study block before opening distracting sites."
         }
