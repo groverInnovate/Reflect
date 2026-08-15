@@ -195,3 +195,7 @@ Added observed, idle, and unobserved timeline kinds plus Daily Review accuracy n
 ## 2026-08-15 - Record the current verification boundary
 
 Core source changes were checked by inspection and a standalone synthetic smoke harness, but this environment currently has Command Line Tools without a matching Xcode toolchain, so SwiftData macro expansion, full Swift Testing, and the signed AppKit bundle cannot be rebuilt here. Native dashboard launch was attempted and failed in AppKit/LaunchServices before the app reached its UI; physical-device and permission checks remain manual acceptance work.
+
+## 2026-08-15 - Preserve same-app task context changes
+
+Replay merging now keeps adjacent blocks separate when their Accessibility window titles differ, even when the app and category are the same. This lets the timeline distinguish project/file work inside VS Code or Xcode while still merging stable heartbeat rows. The alternative preserved minutes but hid task boundaries in a comma-separated detail string.
