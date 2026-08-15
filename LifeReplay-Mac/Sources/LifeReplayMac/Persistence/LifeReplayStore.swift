@@ -3,6 +3,13 @@ import LifeReplayCore
 import OSLog
 import SwiftData
 
+private typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
+private typealias CoreAppCategory = LifeReplayCore.AppCategory
+private typealias CoreFocusSession = LifeReplayCore.FocusSession
+private typealias CoreDriftEvent = LifeReplayCore.DriftEvent
+private typealias CoreDailyReplay = LifeReplayCore.DailyReplay
+private typealias CoreFocusSettings = LifeReplayCore.FocusSettings
+
 private struct ReplaySnapshot {
     var analysis: FocusAnalysis
     var blocks: [TimelineBlock]
@@ -24,8 +31,8 @@ struct DataStatus {
 struct WeeklyRollup {
     var days: Int
     var averageFocusScore: Int
-    var bestDay: DailyReplay?
-    var latestDays: [DailyReplay]
+    var bestDay: CoreDailyReplay?
+    var latestDays: [CoreDailyReplay]
 }
 
 struct FocusProtectionAlert {
@@ -64,6 +71,7 @@ private struct FocusSettingsExport: Codable {
     var driftWindowMinutes: Double
     var baselineSwitchesPerHour: Double
     var productiveSessionMinimumMinutes: Double
+    var maximumObservationGapSeconds: Double
 }
 
 @MainActor
@@ -89,8 +97,8 @@ final class LifeReplayStore {
         try seedFocusSettingsIfNeeded()
     }
 
-    func record(_ event: ActivityEvent) {
-        context.insert(event)
+    func record(_ event: CoreActivityEvent) {
+        context.insert(ActivityEvent(core: event))
         do {
             try context.save()
         } catch {
@@ -98,21 +106,20 @@ final class LifeReplayStore {
         }
     }
 
-    func refreshTodayAnalysis(now: Date = Date()) -> (analysis: FocusAnalysis, newDrifts: [DriftEvent]) {
+    func refreshTodayAnalysis(now: Date = Date()) -> (analysis: FocusAnalysis, newDrifts: [CoreDriftEvent]) {
         let existingDriftKeys = Set(driftEventsForToday(now: now).map(driftKey))
-        let events = eventsForToday(now: now)
-        let analysis = makeFocusEngine().analyze(events: events, now: now)
+        let analysis = analyzeToday(now: now)
         let newDrifts = analysis.driftEvents.filter { !existingDriftKeys.contains(driftKey($0)) }
 
         replaceTodaySessionsAndDrifts(with: analysis, now: now)
         return (analysis, newDrifts)
     }
 
-    func generateDailyReplay(now: Date = Date()) -> DailyReplay? {
+    func generateDailyReplay(now: Date = Date()) -> CoreDailyReplay? {
         generateDailyReplaySnapshot(now: now, narrative: nil, usedOnDeviceAI: false)
     }
 
-    func generateDailyReplayWithNarrative(now: Date = Date()) async -> DailyReplay? {
+    func generateDailyReplayWithNarrative(now: Date = Date()) async -> CoreDailyReplay? {
         let snapshot = replaySnapshot(now: now)
         let narrative = await OnDeviceNarrativeService().generate(
             blocks: snapshot.blocks,
@@ -147,7 +154,7 @@ final class LifeReplayStore {
     func repairTodaySleepGaps(now: Date = Date()) -> RepairResult {
         let settings = focusSettings()
         let repairs = ActivityRepairEngine(configuration: ActivityRepairConfiguration(
-            minimumGapToRepair: max(30 * 60, settings.idleThresholdSeconds * 4),
+            minimumGapToRepair: max(2 * 60 * 60, settings.idleThresholdSeconds * 4),
             idleStartOffset: settings.idleThresholdSeconds
         )).inferredIdleEvents(from: eventsForToday(now: now))
 
@@ -156,7 +163,7 @@ final class LifeReplayStore {
         }
 
         for event in repairs {
-            context.insert(event)
+            context.insert(ActivityEvent(core: event))
         }
 
         do {
@@ -172,8 +179,8 @@ final class LifeReplayStore {
 
     private func replaySnapshot(now: Date) -> ReplaySnapshot {
         let events = eventsForToday(now: now)
-        let analysis = makeFocusEngine().analyze(events: events, now: now)
-        let replayEngine = ReplayEngine()
+        let analysis = analyzeToday(now: now)
+        let replayEngine = makeReplayEngine()
         let blocks = replayEngine.timelineBlocks(
             from: analysis.sessions,
             events: events,
@@ -198,17 +205,17 @@ final class LifeReplayStore {
         narrative: String?,
         usedOnDeviceAI: Bool,
         snapshot providedSnapshot: ReplaySnapshot? = nil
-    ) -> DailyReplay? {
+    ) -> CoreDailyReplay? {
         let snapshot = providedSnapshot ?? replaySnapshot(now: now)
-        let replayEngine = ReplayEngine()
+        let replayEngine = makeReplayEngine()
         do {
             let json = try replayEngine.encode(blocks: snapshot.blocks)
-            let existingReplay = existingDailyReplay(for: now)
-            let replay = existingReplay ?? DailyReplay(
+            let existingReplay = existingDailyReplayRecord(for: now)
+            let replay = existingReplay ?? DailyReplay(core: CoreDailyReplay(
                 date: Calendar.current.startOfDay(for: now),
                 timelineBlocksJSON: json,
                 focusScore: snapshot.analysis.focusScore
-            )
+            ))
             replay.timelineBlocksJSON = json
             replay.focusScore = snapshot.analysis.focusScore
             replay.narrativeSummary = narrative ?? snapshot.insights.journalSummary
@@ -219,40 +226,67 @@ final class LifeReplayStore {
                 context.insert(replay)
             }
             try context.save()
-            return replay
+            return replay.coreValue
         } catch {
             logger.error("Failed to generate daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
 
-    func eventsForToday(now: Date = Date()) -> [ActivityEvent] {
+    func analyzeToday(now: Date = Date()) -> FocusAnalysis {
+        let events = eventsForToday(now: now)
+        return makeFocusEngine().analyze(
+            events: events,
+            now: now,
+            historicalEvents: baselineEvents(now: now)
+        )
+    }
+
+    private func baselineEvents(now: Date) -> [CoreActivityEvent] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let start = calendar.date(byAdding: .day, value: -14, to: today) ?? today
+        let predicate = #Predicate<ActivityEvent> { event in
+            event.timestamp >= start && event.timestamp < today
+        }
+        let descriptor = FetchDescriptor<ActivityEvent>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\ActivityEvent.timestamp, order: .forward)]
+        )
+        do {
+            return try context.fetch(descriptor).map(\.coreValue)
+        } catch {
+            logger.error("Failed to fetch baseline events: \(error.localizedDescription, privacy: .public)")
+            return []
+        }
+    }
+
+    func eventsForToday(now: Date = Date()) -> [CoreActivityEvent] {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
         let predicate = #Predicate<ActivityEvent> { event in
             event.timestamp >= start && event.timestamp < end
         }
-        var descriptor = FetchDescriptor<ActivityEvent>(
+        let descriptor = FetchDescriptor<ActivityEvent>(
             predicate: predicate,
             sortBy: [SortDescriptor(\ActivityEvent.timestamp, order: .forward)]
         )
-        descriptor.fetchLimit = 2_000
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch today's activity events: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
 
-    func categories() -> [AppCategory] {
+    func categories() -> [CoreAppCategory] {
         let descriptor = FetchDescriptor<AppCategory>(
             sortBy: [SortDescriptor(\AppCategory.displayName, order: .forward)]
         )
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch app categories: \(error.localizedDescription, privacy: .public)")
             return []
@@ -272,7 +306,7 @@ final class LifeReplayStore {
         )
     }
 
-    func existingDailyReplay(for date: Date = Date()) -> DailyReplay? {
+    func existingDailyReplay(for date: Date = Date()) -> CoreDailyReplay? {
         let day = Calendar.current.startOfDay(for: date)
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
         let predicate = #Predicate<DailyReplay> { replay in
@@ -285,21 +319,40 @@ final class LifeReplayStore {
         descriptor.fetchLimit = 1
 
         do {
-            return try context.fetch(descriptor).first
+            return try context.fetch(descriptor).first?.coreValue
         } catch {
             logger.error("Failed to fetch daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
 
-    func dailyReplays(limit: Int = 60) -> [DailyReplay] {
+    private func existingDailyReplayRecord(for date: Date = Date()) -> DailyReplay? {
+        let day = Calendar.current.startOfDay(for: date)
+        let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? date
+        let predicate = #Predicate<DailyReplay> { replay in
+            replay.date >= day && replay.date < nextDay
+        }
+        var descriptor = FetchDescriptor<DailyReplay>(
+            predicate: predicate,
+            sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        do {
+            return try context.fetch(descriptor).first
+        } catch {
+            logger.error("Failed to fetch daily replay record: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    func dailyReplays(limit: Int = 60) -> [CoreDailyReplay] {
         var descriptor = FetchDescriptor<DailyReplay>(
             sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
         )
         descriptor.fetchLimit = limit
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch daily replay history: \(error.localizedDescription, privacy: .public)")
             return []
@@ -317,9 +370,9 @@ final class LifeReplayStore {
             sortBy: [SortDescriptor(\DailyReplay.date, order: .reverse)]
         )
 
-        let replays: [DailyReplay]
+        let replays: [CoreDailyReplay]
         do {
-            replays = try context.fetch(descriptor)
+            replays = try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch weekly rollup: \(error.localizedDescription, privacy: .public)")
             replays = []
@@ -332,21 +385,21 @@ final class LifeReplayStore {
         return WeeklyRollup(days: replays.count, averageFocusScore: average, bestDay: best, latestDays: replays)
     }
 
-    private func latestDailyReplay() -> DailyReplay? {
+    private func latestDailyReplay() -> CoreDailyReplay? {
         var descriptor = FetchDescriptor<DailyReplay>(
             sortBy: [SortDescriptor(\DailyReplay.generatedAt, order: .reverse)]
         )
         descriptor.fetchLimit = 1
 
         do {
-            return try context.fetch(descriptor).first
+            return try context.fetch(descriptor).first?.coreValue
         } catch {
             logger.error("Failed to fetch latest daily replay: \(error.localizedDescription, privacy: .public)")
             return nil
         }
     }
 
-    func markdownForDailyReplay(_ replay: DailyReplay) -> String {
+    func markdownForDailyReplay(_ replay: CoreDailyReplay) -> String {
         let replayEngine = ReplayEngine()
         let blocks = (try? replayEngine.decodeBlocks(from: replay.timelineBlocksJSON)) ?? []
         let insights = replayEngine.insightReport(blocks: blocks, driftEvents: [], focusScore: replay.focusScore)
@@ -394,7 +447,7 @@ final class LifeReplayStore {
 
     func exportTodayDebugData(to folderURL: URL, now: Date = Date()) throws {
         let events = eventsForToday(now: now)
-        let analysis = makeFocusEngine().analyze(events: events, now: now)
+        let analysis = analyzeToday(now: now)
         let day = Calendar.current.startOfDay(for: now).formatted(.iso8601.year().month().day())
 
         try csvForActivityEvents(events).write(
@@ -426,7 +479,8 @@ final class LifeReplayStore {
                 sessionMinimumDurationSeconds: settings.sessionMinimumDurationSeconds,
                 driftWindowMinutes: settings.driftWindowMinutes,
                 baselineSwitchesPerHour: settings.baselineSwitchesPerHour,
-                productiveSessionMinimumMinutes: settings.productiveSessionMinimumMinutes
+                productiveSessionMinimumMinutes: settings.productiveSessionMinimumMinutes,
+                maximumObservationGapSeconds: settings.maximumObservationGapSeconds
             )
         )
 
@@ -450,7 +504,13 @@ final class LifeReplayStore {
         )
     }
 
-    func focusProtectionAlert(for event: ActivityEvent, now: Date = Date()) -> FocusProtectionAlert? {
+    func makeReplayEngine() -> ReplayEngine {
+        ReplayEngine(configuration: ReplayEngineConfiguration(
+            maximumObservedGap: focusSettings().maximumObservationGapSeconds
+        ))
+    }
+
+    func focusProtectionAlert(for event: CoreActivityEvent, now: Date = Date()) -> FocusProtectionAlert? {
         guard event.kind == .appActivated || event.kind == .browserDomain else { return nil }
 
         let resolver = CategoryResolver(seeds: categorySeeds())
@@ -466,21 +526,8 @@ final class LifeReplayStore {
         return protectionEngine.signal(for: event, events: events).map(FocusProtectionAlert.init(signal:))
     }
 
-    func focusSettings() -> FocusSettings {
-        var descriptor = FetchDescriptor<FocusSettings>()
-        descriptor.fetchLimit = 1
-        do {
-            if let settings = try context.fetch(descriptor).first {
-                return settings
-            }
-        } catch {
-            logger.error("Failed to fetch focus settings: \(error.localizedDescription, privacy: .public)")
-        }
-
-        let settings = FocusSettings()
-        context.insert(settings)
-        try? context.save()
-        return settings
+    func focusSettings() -> CoreFocusSettings {
+        ensureFocusSettingsRecord().coreValue
     }
 
     func updateFocusSettings(
@@ -488,14 +535,16 @@ final class LifeReplayStore {
         sessionMinimumDurationSeconds: Double,
         driftWindowMinutes: Double,
         baselineSwitchesPerHour: Double,
-        productiveSessionMinimumMinutes: Double
+        productiveSessionMinimumMinutes: Double,
+        maximumObservationGapSeconds: Double
     ) {
-        let settings = focusSettings()
+        let settings = ensureFocusSettingsRecord()
         settings.idleThresholdSeconds = idleThresholdSeconds
         settings.sessionMinimumDurationSeconds = sessionMinimumDurationSeconds
         settings.driftWindowMinutes = driftWindowMinutes
         settings.baselineSwitchesPerHour = baselineSwitchesPerHour
         settings.productiveSessionMinimumMinutes = productiveSessionMinimumMinutes
+        settings.maximumObservationGapSeconds = maximumObservationGapSeconds
 
         do {
             try context.save()
@@ -506,16 +555,12 @@ final class LifeReplayStore {
     }
 
     func replaceCategories(with seeds: [AppCategorySeed]) {
-        for category in categories() {
+        let descriptor = FetchDescriptor<AppCategory>()
+        for category in (try? context.fetch(descriptor)) ?? [] {
             context.delete(category)
         }
         for seed in seeds {
-            context.insert(AppCategory(
-                matchPattern: seed.matchPattern,
-                displayName: seed.displayName,
-                category: seed.category,
-                isUserEdited: true
-            ))
+            context.insert(AppCategory(seed: seed, isUserEdited: true))
         }
 
         do {
@@ -526,7 +571,7 @@ final class LifeReplayStore {
         }
     }
 
-    private func driftEventsForToday(now: Date = Date()) -> [DriftEvent] {
+    private func driftEventsForToday(now: Date = Date()) -> [CoreDriftEvent] {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
@@ -539,14 +584,14 @@ final class LifeReplayStore {
         )
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch today's drift events: \(error.localizedDescription, privacy: .public)")
             return []
         }
     }
 
-    private func focusSessionsForToday(now: Date = Date()) -> [FocusSession] {
+    private func focusSessionsForToday(now: Date = Date()) -> [CoreFocusSession] {
         let interval = Calendar.current.dateInterval(of: .day, for: now)
         let start = interval?.start ?? now
         let end = interval?.end ?? now
@@ -556,7 +601,7 @@ final class LifeReplayStore {
         let descriptor = FetchDescriptor<FocusSession>(predicate: predicate)
 
         do {
-            return try context.fetch(descriptor)
+            return try context.fetch(descriptor).map(\.coreValue)
         } catch {
             logger.error("Failed to fetch today's focus sessions: \(error.localizedDescription, privacy: .public)")
             return []
@@ -564,17 +609,25 @@ final class LifeReplayStore {
     }
 
     private func replaceTodaySessionsAndDrifts(with analysis: FocusAnalysis, now: Date) {
-        for session in focusSessionsForToday(now: now) {
+        let sessionDescriptor = FetchDescriptor<FocusSession>()
+        for session in (try? context.fetch(sessionDescriptor))?.filter({
+            $0.start >= (Calendar.current.dateInterval(of: .day, for: now)?.start ?? now)
+                && $0.start < (Calendar.current.dateInterval(of: .day, for: now)?.end ?? now)
+        }) ?? [] {
             context.delete(session)
         }
-        for drift in driftEventsForToday(now: now) {
+        let driftDescriptor = FetchDescriptor<DriftEvent>()
+        for drift in (try? context.fetch(driftDescriptor))?.filter({
+            $0.timestamp >= (Calendar.current.dateInterval(of: .day, for: now)?.start ?? now)
+                && $0.timestamp < (Calendar.current.dateInterval(of: .day, for: now)?.end ?? now)
+        }) ?? [] {
             context.delete(drift)
         }
         for session in analysis.sessions {
-            context.insert(session)
+            context.insert(FocusSession(core: session))
         }
         for drift in analysis.driftEvents {
-            context.insert(drift)
+            context.insert(DriftEvent(core: drift))
         }
 
         do {
@@ -594,12 +647,12 @@ final class LifeReplayStore {
         }
     }
 
-    private func driftKey(_ event: DriftEvent) -> String {
+    private func driftKey(_ event: CoreDriftEvent) -> String {
         let triggerKey = event.triggerAppNames.sorted().joined(separator: "|")
         return "\(Int(event.timestamp.timeIntervalSince1970))-\(event.switchCountInWindow)-\(triggerKey)"
     }
 
-    private func csvForActivityEvents(_ events: [ActivityEvent]) -> String {
+    private func csvForActivityEvents(_ events: [CoreActivityEvent]) -> String {
         var rows = ["timestamp,kind,appBundleID,appName,windowTitle,browserDomain,source"]
         rows += events.map {
             [
@@ -615,7 +668,7 @@ final class LifeReplayStore {
         return rows.joined(separator: "\n") + "\n"
     }
 
-    private func csvForDriftEvents(_ drifts: [DriftEvent]) -> String {
+    private func csvForDriftEvents(_ drifts: [CoreDriftEvent]) -> String {
         var rows = ["timestamp,triggerAppNames,switchCountInWindow,baselineSwitchRate,severity"]
         rows += drifts.map {
             [
@@ -654,11 +707,7 @@ final class LifeReplayStore {
         guard !missingSeeds.isEmpty else { return }
 
         for seed in missingSeeds {
-            context.insert(AppCategory(
-                matchPattern: seed.matchPattern,
-                displayName: seed.displayName,
-                category: seed.category
-            ))
+            context.insert(AppCategory(seed: seed))
         }
         try context.save()
         logger.info("Seeded \(missingSeeds.count) missing default app categories")
@@ -668,8 +717,25 @@ final class LifeReplayStore {
         var descriptor = FetchDescriptor<FocusSettings>()
         descriptor.fetchLimit = 1
         guard try context.fetch(descriptor).isEmpty else { return }
-        context.insert(FocusSettings())
+        context.insert(FocusSettings(core: CoreFocusSettings()))
         try context.save()
         logger.info("Seeded default focus settings")
+    }
+
+    private func ensureFocusSettingsRecord() -> FocusSettings {
+        var descriptor = FetchDescriptor<FocusSettings>()
+        descriptor.fetchLimit = 1
+        do {
+            if let settings = try context.fetch(descriptor).first {
+                return settings
+            }
+        } catch {
+            logger.error("Failed to fetch focus settings: \(error.localizedDescription, privacy: .public)")
+        }
+
+        let settings = FocusSettings(core: CoreFocusSettings())
+        context.insert(settings)
+        try? context.save()
+        return settings
     }
 }

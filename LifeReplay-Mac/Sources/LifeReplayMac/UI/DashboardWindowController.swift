@@ -170,16 +170,16 @@ final class DashboardWindowController: NSWindowController {
 
     private func dashboardData() -> DashboardData {
         let events = store.eventsForToday()
-        let analysis = store.makeFocusEngine().analyze(events: events, now: Date())
+        let analysis = store.analyzeToday()
         let resolver = CategoryResolver(seeds: store.categorySeeds())
-        let blocks = ReplayEngine().timelineBlocks(
+        let blocks = store.makeReplayEngine().timelineBlocks(
             from: analysis.sessions,
             events: events,
             resolver: resolver,
             now: Date()
         )
         let savedReplay = store.existingDailyReplay()
-        let insights = ReplayEngine().insightReport(
+        let insights = store.makeReplayEngine().insightReport(
             blocks: blocks,
             driftEvents: analysis.driftEvents,
             focusScore: analysis.focusScore
@@ -206,11 +206,12 @@ final class DashboardWindowController: NSWindowController {
             "Today's Numbers",
             "---------------",
             "Focus Score: \(insights.focusScore)/100 - \(focusQuality(insights.focusScore))",
-            "Active observed: \(formatMinutes(max(0, insights.totalTrackedMinutes - insights.idleMinutes)))    Idle/away: \(formatMinutes(insights.idleMinutes))",
+            "Active observed: \(formatMinutes(insights.observedActiveMinutes))    Idle/away: \(formatMinutes(insights.idleMinutes))    Not assigned: \(formatMinutes(insights.unobservedMinutes))",
             "Productive: \(formatMinutes(insights.productiveMinutes))    Study/research: \(formatMinutes(insights.studyLikeMinutes))    Coding/tooling: \(formatMinutes(insights.codingLikeMinutes))",
             "Wasted/distraction: \(formatMinutes(insights.distractingMinutes))    Neutral/unclassified: \(formatMinutes(insights.neutralMinutes))",
             "Deep work: \(formatMinutes(insights.deepWorkMinutes))    Fragmented productive: \(formatMinutes(insights.fragmentedProductiveMinutes))",
             "Focus breaks: \(insights.driftCount)",
+            "Only observed active time is scored. Gaps without fresh evidence are left unassigned instead of charged to the last app.",
             "",
             "Where Time Went",
             "---------------",
@@ -246,7 +247,7 @@ final class DashboardWindowController: NSWindowController {
             "Tracking Health",
             "---------------",
             "Health: \(data.trackingHealth.confidence) - \(data.trackingHealth.summary)",
-            "Events today: \(data.trackingHealth.totalEvents)    Browser tab captures: \(data.trackingHealth.browserDomainEvents)    Window titles: \(data.trackingHealth.windowTitleEvents)",
+            "Events today: \(data.trackingHealth.totalEvents)    Heartbeats: \(data.trackingHealth.heartbeatEvents)    Browser tab captures: \(data.trackingHealth.browserDomainEvents)    Window titles: \(data.trackingHealth.windowTitleEvents)",
             "Last signal: \(data.trackingHealth.lastSignalText)",
         ]
         lines += data.trackingHealth.actions.map { "Action: \($0)" }
@@ -339,7 +340,7 @@ final class DashboardWindowController: NSWindowController {
         return lines.joined(separator: "\n")
     }
 
-    private func renderFocusBreaks(_ drifts: [DriftEvent], insights: DailyInsightReport) -> String {
+    private func renderFocusBreaks(_ drifts: [LifeReplayCore.DriftEvent], insights: DailyInsightReport) -> String {
         var lines = [
             "Focus Breaks",
             "Today - \(Date.now.formatted(date: .long, time: .omitted))",
@@ -368,7 +369,7 @@ final class DashboardWindowController: NSWindowController {
         return lines.joined(separator: "\n")
     }
 
-    private func renderRawEvents(_ events: [ActivityEvent]) -> String {
+    private func renderRawEvents(_ events: [LifeReplayCore.ActivityEvent]) -> String {
         if events.isEmpty {
             return "No raw events captured today."
         }
@@ -380,7 +381,7 @@ final class DashboardWindowController: NSWindowController {
         let end = dateFormatter.string(from: block.end)
         let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
         let detail = block.detail.map { " - \($0)" } ?? ""
-        return "\(start)-\(end)  \(formatMinutes(minutes))  \(categoryLabel(block.category))  \(block.label)\(detail)"
+        return "\(start)-\(end)  \(formatMinutes(minutes))  \(categoryLabel(block.category, kind: block.kind))  \(block.label)\(detail)"
     }
 
     private func compactTimelineForDisplay(_ blocks: [TimelineBlock]) -> [TimelineBlock] {
@@ -398,7 +399,8 @@ final class DashboardWindowController: NSWindowController {
                     end: microRun[microRun.count - 1].end,
                     label: "Mixed \(categoryLabel(microRun[0].category).lowercased()) activity",
                     category: microRun[0].category,
-                    detail: labels.joined(separator: ", ")
+                    detail: labels.joined(separator: ", "),
+                    kind: .observed
                 ))
             }
             microRun.removeAll()
@@ -406,7 +408,7 @@ final class DashboardWindowController: NSWindowController {
 
         for block in blocks {
             let duration = block.end.timeIntervalSince(block.start)
-            if duration < 60, block.label != "Idle period" {
+            if duration < 60, block.kind == .observed {
                 if let last = microRun.last, last.category != block.category {
                     flushMicroRun()
                 }
@@ -420,14 +422,14 @@ final class DashboardWindowController: NSWindowController {
         return compacted
     }
 
-    private func renderDrift(_ drift: DriftEvent) -> String {
+    private func renderDrift(_ drift: LifeReplayCore.DriftEvent) -> String {
         let time = dateFormatter.string(from: drift.timestamp)
         let triggers = drift.triggerAppNames.isEmpty ? "unknown trigger" : drift.triggerAppNames.joined(separator: ", ")
         let severity = Int(drift.severity * 100)
         return "\(time)  \(drift.switchCountInWindow) switches  \(severity)% severity  Trigger: \(triggers)"
     }
 
-    private func renderEvent(_ event: ActivityEvent) -> String {
+    private func renderEvent(_ event: LifeReplayCore.ActivityEvent) -> String {
         let time = dateFormatter.string(from: event.timestamp)
         let name = event.browserDomain ?? event.appName ?? event.appBundleID ?? "-"
         let title = event.windowTitle.map { "  -  \($0)" } ?? ""
@@ -444,17 +446,25 @@ final class DashboardWindowController: NSWindowController {
     }
 
     private func renderActivityLine(_ item: ActivityBreakdownItem) -> String {
-        "\(formatMinutes(item.minutes))  \(categoryLabel(item.category))  \(item.label)"
+        "\(formatMinutes(item.minutes))  \(categoryLabel(item.category, kind: item.kind))  \(item.label)"
     }
 
-    private func categoryLabel(_ category: FocusCategory) -> String {
+    private func categoryLabel(_ category: FocusCategory, kind: TimelineBlockKind = .observed) -> String {
+        switch kind {
+        case .idle:
+            return "Idle / away"
+        case .unobserved:
+            return "Not assigned"
+        case .observed:
+            break
+        }
         switch category {
         case .productive:
-            "Productive"
+            return "Productive"
         case .neutral:
-            "Neutral"
+            return "Neutral"
         case .distracting:
-            "Distracting"
+            return "Distracting"
         }
     }
 
@@ -486,10 +496,11 @@ final class DashboardWindowController: NSWindowController {
         }
     }
 
-    private func trackingHealth(events: [ActivityEvent], insights: DailyInsightReport) -> TrackingHealthReport {
-        let activeObservedMinutes = max(0, insights.totalTrackedMinutes - insights.idleMinutes)
+    private func trackingHealth(events: [LifeReplayCore.ActivityEvent], insights: DailyInsightReport) -> TrackingHealthReport {
+        let activeObservedMinutes = insights.observedActiveMinutes
         let activeEvents = events.filter { $0.kind == .appActivated || $0.kind == .browserDomain }
         let browserDomainEvents = events.filter { $0.kind == .browserDomain }.count
+        let heartbeatEvents = events.filter { $0.kind == .heartbeat }.count
         let windowTitleEvents = events.filter { $0.windowTitle?.isEmpty == false }.count
         let browserAppEvents = events.filter(isBrowserAppEvent).count
         let idleStarts = events.filter { $0.kind == .idleStart }.count
@@ -527,6 +538,12 @@ final class DashboardWindowController: NSWindowController {
             actions.append("Keep the app running continuously; if the Mac slept, run Repair Sleep Gaps.")
         }
 
+        if insights.unobservedMinutes >= 10 {
+            confidence = maxRisk(confidence, "Medium")
+            summary = "Some time was left unassigned because fresh activity evidence was missing."
+            actions.append("Keep Life Replay running; unobserved gaps are excluded rather than guessed.")
+        }
+
         if neutralShare >= 0.35 {
             confidence = maxRisk(confidence, "Medium")
             summary = "A large share of visible time is neutral or unclassified."
@@ -561,6 +578,7 @@ final class DashboardWindowController: NSWindowController {
             confidence: confidence,
             summary: summary,
             totalEvents: events.count,
+            heartbeatEvents: heartbeatEvents,
             browserDomainEvents: browserDomainEvents,
             windowTitleEvents: windowTitleEvents,
             lastSignalText: lastEvent.map(relativeSignalText) ?? "none today",
@@ -568,7 +586,7 @@ final class DashboardWindowController: NSWindowController {
         )
     }
 
-    private func isBrowserAppEvent(_ event: ActivityEvent) -> Bool {
+    private func isBrowserAppEvent(_ event: LifeReplayCore.ActivityEvent) -> Bool {
         let candidates = [
             event.appName,
             event.appBundleID,
@@ -596,7 +614,7 @@ final class DashboardWindowController: NSWindowController {
         return (order[candidate, default: 0] > order[current, default: 0]) ? candidate : current
     }
 
-    private func categoryFixCandidates(events: [ActivityEvent], resolver: CategoryResolver) -> [CategoryFixCandidate] {
+    private func categoryFixCandidates(events: [LifeReplayCore.ActivityEvent], resolver: CategoryResolver) -> [CategoryFixCandidate] {
         let meaningfulEvents = events
             .filter { $0.kind == .appActivated || $0.kind == .browserDomain }
             .sorted { $0.timestamp < $1.timestamp }
@@ -606,7 +624,12 @@ final class DashboardWindowController: NSWindowController {
 
         for (index, event) in meaningfulEvents.enumerated() {
             guard resolver.category(for: event) == .neutral else { continue }
-            let nextTimestamp = index + 1 < meaningfulEvents.count ? meaningfulEvents[index + 1].timestamp : Date()
+            let rawNextTimestamp = index + 1 < meaningfulEvents.count ? meaningfulEvents[index + 1].timestamp : Date()
+            let maximumObservationGap = store.focusSettings().maximumObservationGapSeconds
+            let nextTimestamp = min(
+                rawNextTimestamp,
+                event.timestamp.addingTimeInterval(maximumObservationGap)
+            )
             let minutes = max(0, Int(nextTimestamp.timeIntervalSince(event.timestamp) / 60))
             guard minutes > 0, let pattern = candidatePattern(for: event) else { continue }
 
@@ -629,7 +652,7 @@ final class DashboardWindowController: NSWindowController {
             .map { $0 }
     }
 
-    private func candidatePattern(for event: ActivityEvent) -> String? {
+    private func candidatePattern(for event: LifeReplayCore.ActivityEvent) -> String? {
         if let domain = event.browserDomain, !domain.isEmpty {
             return domain
         }
@@ -728,10 +751,10 @@ final class DashboardWindowController: NSWindowController {
 }
 
 private struct DashboardData {
-    var events: [ActivityEvent]
+    var events: [LifeReplayCore.ActivityEvent]
     var analysis: FocusAnalysis
     var blocks: [TimelineBlock]
-    var savedReplay: DailyReplay?
+    var savedReplay: LifeReplayCore.DailyReplay?
     var insights: DailyInsightReport
     var trackingHealth: TrackingHealthReport
     var categoryCandidates: [CategoryFixCandidate]
@@ -741,6 +764,7 @@ private struct TrackingHealthReport {
     var confidence: String
     var summary: String
     var totalEvents: Int
+    var heartbeatEvents: Int
     var browserDomainEvents: Int
     var windowTitleEvents: Int
     var lastSignalText: String

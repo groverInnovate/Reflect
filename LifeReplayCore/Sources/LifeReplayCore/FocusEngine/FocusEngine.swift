@@ -6,19 +6,22 @@ public struct FocusEngineConfiguration: Sendable {
     public var driftWindow: TimeInterval
     public var defaultBaselineSwitchesPerHour: Double
     public var productiveSessionMinimumDuration: TimeInterval
+    public var maximumObservedGap: TimeInterval
 
     public init(
         idleThresholdSeconds: TimeInterval = 90,
         sessionMinimumDuration: TimeInterval = 90,
         driftWindow: TimeInterval = 10 * 60,
         defaultBaselineSwitchesPerHour: Double = 12,
-        productiveSessionMinimumDuration: TimeInterval = 5 * 60
+        productiveSessionMinimumDuration: TimeInterval = 5 * 60,
+        maximumObservedGap: TimeInterval = 120
     ) {
         self.idleThresholdSeconds = idleThresholdSeconds
         self.sessionMinimumDuration = sessionMinimumDuration
         self.driftWindow = driftWindow
         self.defaultBaselineSwitchesPerHour = defaultBaselineSwitchesPerHour
         self.productiveSessionMinimumDuration = productiveSessionMinimumDuration
+        self.maximumObservedGap = max(30, maximumObservedGap)
     }
 }
 
@@ -40,26 +43,41 @@ public struct FocusEngine: Sendable {
         self.resolver = resolver
     }
 
-    public func analyze(events: [ActivityEvent], now: Date? = nil) -> FocusAnalysis {
+    /// Analyze observed time, optionally using prior days to calibrate the
+    /// user's normal switching rate for this hour of day.
+    public func analyze(
+        events: [ActivityEvent],
+        now: Date? = nil,
+        historicalEvents: [ActivityEvent] = []
+    ) -> FocusAnalysis {
         let orderedEvents = events.sorted { $0.timestamp < $1.timestamp }
-        let sessions = buildSessions(from: orderedEvents, now: now)
-        applyIdleDurations(to: sessions, events: orderedEvents, now: now ?? orderedEvents.last?.timestamp ?? Date())
-        let drifts = detectDrift(in: orderedEvents, sessions: sessions)
+        let resolvedNow = now ?? orderedEvents.last?.timestamp ?? Date()
+        let timeline = ActivityTimelineEngine(
+            configuration: ActivityTimelineConfiguration(
+                maximumObservedGap: configuration.maximumObservedGap
+            )
+        ).blocks(from: orderedEvents, resolver: resolver, now: resolvedNow)
+        let sessions = buildSessions(from: timeline)
+        let drifts = detectDrift(
+            in: orderedEvents,
+            sessions: sessions,
+            historicalEvents: historicalEvents
+        )
         let score = score(sessions: sessions, driftEvents: drifts)
         return FocusAnalysis(sessions: sessions, driftEvents: drifts, focusScore: score)
     }
 
     public func score(sessions: [FocusSession], driftEvents: [DriftEvent]) -> Int {
-        let trackedSeconds = sessions.reduce(0) { total, session in
-            total + max(0, (session.end ?? session.start).timeIntervalSince(session.start) - Double(session.idleSeconds))
+        let trackedSeconds = sessions.reduce(0.0) { total, session in
+            total + activeDuration(of: session)
         }
 
         guard trackedSeconds > 0 else { return 0 }
 
         let productiveSeconds = sessions
             .filter { $0.category == .productive }
-            .reduce(0) { total, session in
-                total + max(0, (session.end ?? session.start).timeIntervalSince(session.start) - Double(session.idleSeconds))
+            .reduce(0.0) { total, session in
+                total + activeDuration(of: session)
             }
 
         let productiveContribution = min(90, Int((productiveSeconds / trackedSeconds) * 90))
@@ -69,120 +87,150 @@ public struct FocusEngine: Sendable {
         return max(0, min(100, productiveContribution + driftContribution))
     }
 
-    private func buildSessions(from events: [ActivityEvent], now: Date?) -> [FocusSession] {
-        let meaningfulEvents = events.filter { $0.kind == .appActivated || $0.kind == .browserDomain }
-        guard let first = meaningfulEvents.first else { return [] }
+    private func activeDuration(of session: FocusSession) -> TimeInterval {
+        guard let end = session.end else { return 0 }
+        return max(0, end.timeIntervalSince(session.start) - Double(session.idleSeconds))
+    }
 
+    private func buildSessions(from blocks: [TimelineBlock]) -> [FocusSession] {
         var sessions: [FocusSession] = []
-        var current = FocusSession(
-            start: first.timestamp,
-            category: resolver.category(for: first),
-            primaryAppName: resolver.displayName(for: first),
-            switchCount: 0
-        )
+        var current: FocusSession?
+        var primaryLabelDuration: TimeInterval = 0
 
-        for event in meaningfulEvents.dropFirst() {
-            let category = resolver.category(for: event)
-            let gap = event.timestamp.timeIntervalSince(current.start)
+        for block in blocks where block.kind == .observed && block.end > block.start {
+            let duration = block.end.timeIntervalSince(block.start)
 
-            if category == current.category || gap < configuration.sessionMinimumDuration {
-                current.end = event.timestamp
-                current.switchCount += 1
-                if current.primaryAppName == nil {
-                    current.primaryAppName = resolver.displayName(for: event)
+            if let current,
+               current.category == block.category,
+               abs(block.start.timeIntervalSince(current.end ?? current.start)) < 0.5 {
+                let changedSurface = current.primaryAppName != block.label
+                current.end = block.end
+                if changedSurface {
+                    current.switchCount += 1
+                }
+                if duration > primaryLabelDuration {
+                    current.primaryAppName = block.label
+                    primaryLabelDuration = duration
                 }
                 continue
             }
 
-            current.end = event.timestamp
-            sessions.append(current)
+            if let current {
+                sessions.append(current)
+            }
             current = FocusSession(
-                start: event.timestamp,
-                category: category,
-                primaryAppName: resolver.displayName(for: event)
+                start: block.start,
+                end: block.end,
+                category: block.category,
+                primaryAppName: block.label,
+                switchCount: 0,
+                idleSeconds: 0
             )
+            primaryLabelDuration = duration
         }
 
-        current.end = now ?? meaningfulEvents.last?.timestamp ?? current.start
-        sessions.append(current)
+        if let current {
+            sessions.append(current)
+        }
         return sessions
     }
 
-    private func applyIdleDurations(to sessions: [FocusSession], events: [ActivityEvent], now: Date) {
-        let intervals = idleIntervals(from: events, now: now)
-        for session in sessions {
-            guard let sessionEnd = session.end else { continue }
-            let idleSeconds = intervals.reduce(0.0) { total, interval in
-                let overlapStart = max(session.start, interval.start)
-                let overlapEnd = min(sessionEnd, interval.end)
-                guard overlapEnd > overlapStart else { return total }
-                return total + overlapEnd.timeIntervalSince(overlapStart)
-            }
-            session.idleSeconds = Int(idleSeconds.rounded())
-        }
-    }
-
-    private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
-        var intervals: [(start: Date, end: Date)] = []
-        var idleStart: Date?
-
-        for event in events {
-            switch event.kind {
-            case .idleStart:
-                idleStart = event.timestamp
-            case .idleEnd:
-                if let start = idleStart, event.timestamp > start {
-                    intervals.append((start, event.timestamp))
-                }
-                idleStart = nil
-            case .appActivated, .browserDomain:
-                continue
-            }
-        }
-
-        if let start = idleStart, now > start {
-            intervals.append((start, now))
-        }
-        return intervals
-    }
-
-    private func detectDrift(in events: [ActivityEvent], sessions: [FocusSession]) -> [DriftEvent] {
+    private func detectDrift(
+        in events: [ActivityEvent],
+        sessions: [FocusSession],
+        historicalEvents: [ActivityEvent]
+    ) -> [DriftEvent] {
         sessions.compactMap { session in
             guard
                 session.category == .productive,
                 let end = session.end,
-                end.timeIntervalSince(session.start) >= configuration.productiveSessionMinimumDuration
+                activeDuration(of: session) >= configuration.productiveSessionMinimumDuration
             else {
                 return nil
             }
 
             let windowEnd = end.addingTimeInterval(configuration.driftWindow)
-            let windowEvents = events.filter {
-                ($0.kind == .appActivated || $0.kind == .browserDomain)
-                    && $0.timestamp >= end
-                    && $0.timestamp <= windowEnd
+            let switchEvents = normalizedSwitchEvents(from: events).filter {
+                $0.timestamp >= end && $0.timestamp <= windowEnd
             }
-
-            let distractingNames = windowEvents
+            let distractingNames = switchEvents
                 .filter { resolver.category(for: $0) == .distracting }
                 .map { resolver.displayName(for: $0) }
 
-            let baselineForWindow = configuration.defaultBaselineSwitchesPerHour * (configuration.driftWindow / 3600)
-            let threshold = max(1, Int(ceil(2 * baselineForWindow)))
+            let baseline = baselineSwitchRate(
+                around: session.start,
+                historicalEvents: historicalEvents
+            )
+            let baselineForWindow = baseline * (configuration.driftWindow / 3600)
+            let threshold = max(2, Int(ceil(2 * baselineForWindow)))
 
-            guard windowEvents.count >= threshold, !distractingNames.isEmpty else {
+            guard switchEvents.count >= threshold, !distractingNames.isEmpty else {
                 return nil
             }
 
-            let severity = min(1, Double(windowEvents.count) / max(1, Double(threshold)))
+            let severity = min(1, Double(switchEvents.count) / Double(threshold))
             return DriftEvent(
-                timestamp: windowEvents.first?.timestamp ?? end,
+                timestamp: switchEvents.first?.timestamp ?? end,
                 precedingSessionID: session.id,
                 triggerAppNames: Array(Set(distractingNames)).sorted(),
-                switchCountInWindow: windowEvents.count,
-                baselineSwitchRate: configuration.defaultBaselineSwitchesPerHour,
+                switchCountInWindow: switchEvents.count,
+                baselineSwitchRate: baseline,
                 severity: severity
             )
         }
+    }
+
+    private func baselineSwitchRate(
+        around date: Date,
+        historicalEvents: [ActivityEvent]
+    ) -> Double {
+        let switchEvents = normalizedSwitchEvents(from: historicalEvents)
+        let calendar = Calendar.autoupdatingCurrent
+        let hour = calendar.component(.hour, from: date)
+        let dayKeys = Set(switchEvents.map { calendar.startOfDay(for: $0.timestamp) })
+
+        // The default is intentionally used until there are seven distinct
+        // days. A handful of anomalous days should not redefine "normal".
+        guard dayKeys.count >= 7 else {
+            return configuration.defaultBaselineSwitchesPerHour
+        }
+
+        let rates = dayKeys.compactMap { day -> Double? in
+            let count = switchEvents.filter {
+                calendar.startOfDay(for: $0.timestamp) == day
+                    && calendar.component(.hour, from: $0.timestamp) == hour
+            }.count
+            return Double(count)
+        }.sorted()
+
+        guard !rates.isEmpty else {
+            return configuration.defaultBaselineSwitchesPerHour
+        }
+        let middle = rates.count / 2
+        if rates.count.isMultiple(of: 2) {
+            return (rates[middle - 1] + rates[middle]) / 2
+        }
+        return rates[middle]
+    }
+
+    /// App activation and browser-domain capture can describe the same user
+    /// action at the same timestamp. Count that as one transition; otherwise a
+    /// browser switch would inflate both drift severity and the user's baseline.
+    private func normalizedSwitchEvents(from events: [ActivityEvent]) -> [ActivityEvent] {
+        var normalized: [ActivityEvent] = []
+
+        for event in events.sorted(by: { $0.timestamp < $1.timestamp }) {
+            guard event.kind == .appActivated || event.kind == .browserDomain else { continue }
+
+            if let lastIndex = normalized.indices.last,
+               normalized[lastIndex].timestamp == event.timestamp {
+                if event.kind == .browserDomain {
+                    normalized[lastIndex] = event
+                }
+            } else {
+                normalized.append(event)
+            }
+        }
+        return normalized
     }
 }

@@ -81,7 +81,7 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         }
     }
 
-    func notify(driftEvent: DriftEvent) {
+    func notify(driftEvent: LifeReplayCore.DriftEvent) {
         guard isBundledApp else {
             logger.info("Drift notification skipped while running outside an app bundle")
             return
@@ -210,7 +210,7 @@ final class DriftNotificationController: NSObject, UNUserNotificationCenterDeleg
         completionHandler()
     }
 
-    private func body(for driftEvent: DriftEvent) -> String {
+    private func body(for driftEvent: LifeReplayCore.DriftEvent) -> String {
         let triggers = driftEvent.triggerAppNames.isEmpty
             ? "a distracting app"
             : driftEvent.triggerAppNames.joined(separator: ", ")

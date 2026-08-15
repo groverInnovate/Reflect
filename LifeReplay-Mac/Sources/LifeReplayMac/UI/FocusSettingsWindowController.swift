@@ -9,12 +9,13 @@ final class FocusSettingsWindowController: NSWindowController {
     private let driftWindowField = NSTextField()
     private let baselineField = NSTextField()
     private let productiveField = NSTextField()
+    private let observationGapField = NSTextField()
     private let statusLabel = NSTextField(labelWithString: "")
 
     init(store: LifeReplayStore) {
         self.store = store
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 340),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -39,6 +40,7 @@ final class FocusSettingsWindowController: NSWindowController {
         driftWindowField.doubleValue = settings.driftWindowMinutes
         baselineField.doubleValue = settings.baselineSwitchesPerHour
         productiveField.doubleValue = settings.productiveSessionMinimumMinutes
+        observationGapField.doubleValue = settings.maximumObservationGapSeconds
         statusLabel.stringValue = ""
     }
 
@@ -51,6 +53,7 @@ final class FocusSettingsWindowController: NSWindowController {
             row("Drift window, minutes", driftWindowField),
             row("Baseline switches / hour", baselineField),
             row("Productive block minimum, minutes", productiveField),
+            row("Maximum unobserved gap, seconds", observationGapField),
         ])
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.rowSpacing = 10
@@ -101,7 +104,8 @@ final class FocusSettingsWindowController: NSWindowController {
             sessionMinimumDurationSeconds: sessionField.doubleValue,
             driftWindowMinutes: driftWindowField.doubleValue,
             baselineSwitchesPerHour: baselineField.doubleValue,
-            productiveSessionMinimumMinutes: productiveField.doubleValue
+            productiveSessionMinimumMinutes: productiveField.doubleValue,
+            maximumObservationGapSeconds: observationGapField.doubleValue
         )
         statusLabel.stringValue = "Saved and recomputed today."
     }

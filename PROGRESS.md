@@ -22,7 +22,7 @@
   - [ ] Real coding-session verification completed by Mohit
 - [ ] Phase 2 - Focus Drift Engine
   - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
-  - [x] Synthetic XCTest coverage added
+  - [x] Synthetic core coverage added with Swift Testing fixtures
   - [x] Live Mac event stream wired into persistence
   - [x] Drift notifications implemented for bundled app runs
   - [x] User-tunable drift thresholds implemented
@@ -159,4 +159,16 @@
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
 - Added Category Fix Candidates to the Daily Review so top neutral app/domain patterns can be quickly classified through Edit Categories.
 - `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Progress stopped
+
+## 2026-08-15 Product and accounting rescue
+
+- Audited the product around the evening-mentor promise and documented the findings in `PRODUCT_AUDIT.md`.
+- Removed the P0 daily fetch cap that silently discarded most events after roughly 2,000 rows.
+- Added active `.heartbeat` events, a configurable maximum observation gap, and explicit `observed`, `idle`, and `unobserved` timeline blocks. Missing evidence is no longer charged to the last app or included in the focus score.
+- Reworked focus analysis to use the evidence-bounded timeline, split sessions around idle/unobserved intervals, exclude heartbeats from switch counts, and use a seven-day same-hour median baseline when available.
+- Normalized same-timestamp app activation plus browser-domain signals so one action cannot count as two switches.
+- Moved SwiftData records to the Mac persistence boundary while preserving existing entity names, so the core engines are independently testable and old stores remain compatible.
+- Raised inferred sleep/away repair to genuinely long gaps (two hours) and labeled the result as inferred rather than certain.
+- Added regression fixtures for heartbeats, idle separation, long silent gaps, browser interval continuity, duplicate switch signals, and the new observation-gap setting.
+- Updated the dashboard and README to explain observed, idle/away, and not-assigned time, plus the honest frontmost/split-screen limitation.
+- Verification is currently limited by this environment: it has Command Line Tools but no matching full Xcode toolchain, so SwiftData macro expansion, the signed Mac app, and on-device permissions still require Mohit’s Xcode/device check. A standalone core smoke harness was run before the toolchain mismatch appeared; native dashboard launch was attempted but failed in AppKit/LaunchServices before UI inspection.

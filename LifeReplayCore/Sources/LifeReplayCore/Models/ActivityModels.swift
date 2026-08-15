@@ -1,7 +1,5 @@
 import Foundation
-import SwiftData
 
-@Model
 public final class ActivityEvent {
     public var timestamp: Date
     public var kindRawValue: String
@@ -40,9 +38,12 @@ public enum ActivityKind: String, Codable, Sendable {
     case idleStart
     case idleEnd
     case browserDomain
+    /// A periodic proof that the frontmost surface is still visible and active.
+    /// State-change events alone cannot tell the difference between a user who
+    /// stayed in an app and an app that stopped being observed for an hour.
+    case heartbeat
 }
 
-@Model
 public final class AppCategory {
     public var matchPattern: String
     public var displayName: String
@@ -73,7 +74,6 @@ public enum FocusCategory: String, Codable, Sendable {
     case distracting
 }
 
-@Model
 public final class FocusSession {
     public var id: UUID
     public var start: Date
@@ -107,7 +107,6 @@ public final class FocusSession {
     }
 }
 
-@Model
 public final class DriftEvent {
     public var timestamp: Date
     public var precedingSessionID: UUID?
@@ -133,7 +132,6 @@ public final class DriftEvent {
     }
 }
 
-@Model
 public final class HealthSnapshot {
     public var date: Date
     public var avgHeartRate: Double?
@@ -149,7 +147,6 @@ public final class HealthSnapshot {
     }
 }
 
-@Model
 public final class DailyReplay {
     public var date: Date
     public var timelineBlocksJSON: String
@@ -158,35 +155,45 @@ public final class DailyReplay {
     public var generatedAt: Date
     public var usedOnDeviceAI: Bool
 
-    public init(date: Date, timelineBlocksJSON: String, focusScore: Int) {
+    public init(
+        date: Date,
+        timelineBlocksJSON: String,
+        focusScore: Int,
+        narrativeSummary: String? = nil,
+        generatedAt: Date = Date(),
+        usedOnDeviceAI: Bool = false
+    ) {
         self.date = date
         self.timelineBlocksJSON = timelineBlocksJSON
         self.focusScore = focusScore
-        self.generatedAt = Date()
-        self.usedOnDeviceAI = false
+        self.narrativeSummary = narrativeSummary
+        self.generatedAt = generatedAt
+        self.usedOnDeviceAI = usedOnDeviceAI
     }
 }
 
-@Model
 public final class FocusSettings {
     public var idleThresholdSeconds: Double
     public var sessionMinimumDurationSeconds: Double
     public var driftWindowMinutes: Double
     public var baselineSwitchesPerHour: Double
     public var productiveSessionMinimumMinutes: Double
+    public var maximumObservationGapSeconds: Double
 
     public init(
         idleThresholdSeconds: Double = 90,
         sessionMinimumDurationSeconds: Double = 90,
         driftWindowMinutes: Double = 10,
         baselineSwitchesPerHour: Double = 12,
-        productiveSessionMinimumMinutes: Double = 5
+        productiveSessionMinimumMinutes: Double = 5,
+        maximumObservationGapSeconds: Double = 120
     ) {
         self.idleThresholdSeconds = idleThresholdSeconds
         self.sessionMinimumDurationSeconds = sessionMinimumDurationSeconds
         self.driftWindowMinutes = driftWindowMinutes
         self.baselineSwitchesPerHour = baselineSwitchesPerHour
         self.productiveSessionMinimumMinutes = productiveSessionMinimumMinutes
+        self.maximumObservationGapSeconds = maximumObservationGapSeconds
     }
 
     public var focusEngineConfiguration: FocusEngineConfiguration {
@@ -195,9 +202,16 @@ public final class FocusSettings {
             sessionMinimumDuration: sessionMinimumDurationSeconds,
             driftWindow: driftWindowMinutes * 60,
             defaultBaselineSwitchesPerHour: baselineSwitchesPerHour,
-            productiveSessionMinimumDuration: productiveSessionMinimumMinutes * 60
+            productiveSessionMinimumDuration: productiveSessionMinimumMinutes * 60,
+            maximumObservedGap: maximumObservationGapSeconds
         )
     }
+}
+
+public enum TimelineBlockKind: String, Codable, Sendable {
+    case observed
+    case idle
+    case unobserved
 }
 
 public struct TimelineBlock: Codable, Equatable, Sendable {
@@ -206,12 +220,56 @@ public struct TimelineBlock: Codable, Equatable, Sendable {
     public var label: String
     public var category: FocusCategory
     public var detail: String?
+    public var kind: TimelineBlockKind
 
-    public init(start: Date, end: Date, label: String, category: FocusCategory, detail: String? = nil) {
+    public init(
+        start: Date,
+        end: Date,
+        label: String,
+        category: FocusCategory,
+        detail: String? = nil,
+        kind: TimelineBlockKind = .observed
+    ) {
         self.start = start
         self.end = end
         self.label = label
         self.category = category
         self.detail = detail
+        if kind == .observed && (label == "Idle period" || label == "Idle / away") {
+            self.kind = .idle
+        } else {
+            self.kind = kind
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case start, end, label, category, detail, kind
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        start = try container.decode(Date.self, forKey: .start)
+        end = try container.decode(Date.self, forKey: .end)
+        label = try container.decode(String.self, forKey: .label)
+        category = try container.decode(FocusCategory.self, forKey: .category)
+        detail = try container.decodeIfPresent(String.self, forKey: .detail)
+        // Replays generated before observation quality was modeled remain readable.
+        if let decodedKind = try container.decodeIfPresent(TimelineBlockKind.self, forKey: .kind) {
+            kind = decodedKind
+        } else if label == "Idle period" || label == "Idle / away" {
+            kind = .idle
+        } else {
+            kind = .observed
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(start, forKey: .start)
+        try container.encode(end, forKey: .end)
+        try container.encode(label, forKey: .label)
+        try container.encode(category, forKey: .category)
+        try container.encodeIfPresent(detail, forKey: .detail)
+        try container.encode(kind, forKey: .kind)
     }
 }

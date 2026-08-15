@@ -167,3 +167,31 @@ Added a Tracking Health section to Daily Review that checks event density, brows
 ## 2026-07-07 - Turn neutral time into category fixes
 
 Added Category Fix Candidates to the Daily Review so neutral app/domain time produces concrete rule patterns to review. The alternative was a vague "edit categories" hint, but accuracy improves fastest when the app points at the exact unlabeled surfaces.
+
+## 2026-08-15 - Bound time attribution with active heartbeats
+
+Added a `.heartbeat` activity signal and a configurable two-minute maximum observation gap. State-change events alone cannot prove that the last app remained active, so stale gaps are now explicitly unobserved and excluded from scoring. The alternative was to keep assigning missing time to the last surface, which made the journal confidently wrong after collector failures or sleep.
+
+## 2026-08-15 - Keep SwiftData at the Mac persistence boundary
+
+Moved SwiftData `@Model` records into the Mac target and kept `LifeReplayCore` as pure Foundation types plus engines, while preserving the existing SwiftData entity names for store continuity. The alternative was to leave persistence macros in the core package, which prevented the accounting logic from being compiled and tested independently with the available command-line toolchain.
+
+## 2026-08-15 - Prefer exact observed category transitions over session hysteresis
+
+Focus sessions now represent contiguous observed category intervals; idle and unobserved intervals split them, and heartbeat signals do not count as switches. The existing minimum-session setting remains exposed for compatibility, but timeline/task attribution is exact rather than waiting 90 seconds to decide whether a real transition “counts.” The alternative would have made short but real distractions disappear from the replay.
+
+## 2026-08-15 - Normalize same-timestamp app and browser signals
+
+Drift and historical baseline calculations collapse an app activation plus browser-domain capture at the same timestamp into one transition, preferring the domain for classification. The alternative double-counted a single browser switch and made drift severity and personal baselines depend on collector implementation details.
+
+## 2026-08-15 - Repair only genuinely long missing gaps
+
+Raised automatic sleep/away repair from 30 minutes to two hours and relabeled inserted intervals as inferred away/sleep. A missing event is not proof of sleep, so the product should leave ordinary gaps unassigned and let the user correct only obvious overnight/lid-close gaps. The alternative risked erasing real deep work.
+
+## 2026-08-15 - Treat uncertainty as a first-class mentor output
+
+Added observed, idle, and unobserved timeline kinds plus Daily Review accuracy notes, Tracking Health actions, and category-fix candidates. The alternative was a single productivity score with no way to tell whether a good day reflected real focus or incomplete capture.
+
+## 2026-08-15 - Record the current verification boundary
+
+Core source changes were checked by inspection and a standalone synthetic smoke harness, but this environment currently has Command Line Tools without a matching Xcode toolchain, so SwiftData macro expansion, full Swift Testing, and the signed AppKit bundle cannot be rebuilt here. Native dashboard launch was attempted and failed in AppKit/LaunchServices before the app reached its UI; physical-device and permission checks remain manual acceptance work.

@@ -69,7 +69,7 @@ struct ReplayEngineTests {
 
         let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(1_500))
 
-        #expect(blocks.contains { $0.label == "Idle period" && $0.start == start.addingTimeInterval(900) })
+        #expect(blocks.contains { $0.label == "Idle / away" && $0.kind == .idle && $0.start == start.addingTimeInterval(900) })
     }
 
     @Test("idle time is not double counted inside productive timeline blocks")
@@ -88,7 +88,7 @@ struct ReplayEngineTests {
             .filter { $0.category == .productive }
             .reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) }
         let idleMinutes = blocks
-            .filter { $0.label == "Idle period" }
+            .filter { $0.kind == .idle }
             .reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) }
 
         #expect(blocks.count == 3)
@@ -104,7 +104,13 @@ struct ReplayEngineTests {
         ]
         let events = [
             ActivityEvent(timestamp: start, kind: .browserDomain, browserDomain: "chatgpt.com"),
+        ] + stride(from: 60, to: 15 * 60, by: 60).map {
+            ActivityEvent(timestamp: start.addingTimeInterval(TimeInterval($0)), kind: .heartbeat, browserDomain: "chatgpt.com")
+        } + [
             ActivityEvent(timestamp: start.addingTimeInterval(15 * 60), kind: .browserDomain, browserDomain: "rust-book.cs.brown.edu"),
+        ] + stride(from: 16 * 60, to: 89 * 60, by: 60).map {
+            ActivityEvent(timestamp: start.addingTimeInterval(TimeInterval($0)), kind: .heartbeat, browserDomain: "rust-book.cs.brown.edu")
+        } + [
             ActivityEvent(timestamp: start.addingTimeInterval(89 * 60), kind: .idleStart),
         ]
 
@@ -122,6 +128,27 @@ struct ReplayEngineTests {
             label: "Rust Book",
             category: .productive
         )))
+    }
+
+    @Test("does not assign a long silent gap to the previous app")
+    func longSilentGapBecomesUnobserved() {
+        let start = Date(timeIntervalSince1970: 0)
+        let events = [
+            ActivityEvent(timestamp: start, kind: .appActivated, appName: "VS Code"),
+        ]
+
+        let blocks = ReplayEngine().timelineBlocks(
+            from: [],
+            events: events,
+            now: start.addingTimeInterval(60 * 60)
+        )
+
+        #expect(blocks.contains { $0.kind == .observed && $0.label == "VS Code" && $0.end.timeIntervalSince($0.start) == 120 })
+        #expect(blocks.contains { $0.kind == .unobserved && $0.label == "Unobserved / away" })
+        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
+        #expect(report.productiveMinutes == 2)
+        #expect(report.unobservedMinutes == 58)
+        #expect(report.journalSummary.contains("unobserved"))
     }
 
     @Test("insight report turns timeline blocks into journal metrics")

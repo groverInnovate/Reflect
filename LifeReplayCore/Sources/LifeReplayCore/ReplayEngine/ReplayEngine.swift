@@ -2,9 +2,11 @@ import Foundation
 
 public struct ReplayEngineConfiguration: Sendable {
     public var mergeGap: TimeInterval
+    public var maximumObservedGap: TimeInterval
 
-    public init(mergeGap: TimeInterval = 3 * 60) {
+    public init(mergeGap: TimeInterval = 3 * 60, maximumObservedGap: TimeInterval = 120) {
         self.mergeGap = mergeGap
+        self.maximumObservedGap = maximumObservedGap
     }
 }
 
@@ -29,11 +31,21 @@ public struct ReplayEngine: Sendable {
         resolver: CategoryResolver,
         now: Date = Date()
     ) -> [TimelineBlock] {
-        let idleIntervals = idleIntervals(from: events, now: now)
-        let activeBlocks = eventTimelineBlocks(from: events, idleIntervals: idleIntervals, resolver: resolver, now: now)
-        let sessionBlocks = activeBlocks.isEmpty ? sessionBlocks(from: sessions, excluding: idleIntervals) : activeBlocks
-        let idleBlocks = idleTimelineBlocks(from: idleIntervals)
-        return mergeBlocks((sessionBlocks + idleBlocks).sorted { $0.start < $1.start })
+        let eventBlocks = ActivityTimelineEngine(
+            configuration: ActivityTimelineConfiguration(
+                maximumObservedGap: configuration.maximumObservedGap
+            )
+        ).blocks(from: events, resolver: resolver, now: now)
+
+        // Events are the source of truth when present. Session blocks remain a
+        // fallback for an old store that predates the raw event timeline.
+        let hasMeaningfulEvent = events.contains {
+            $0.kind == .appActivated || $0.kind == .browserDomain || $0.kind == .heartbeat
+        }
+        let fallbackBlocks = hasMeaningfulEvent
+            ? []
+            : sessionBlocks(from: sessions, excluding: idleIntervals(from: events, now: now))
+        return mergeBlocks((fallbackBlocks + eventBlocks).sorted { $0.start < $1.start })
     }
 
     private func sessionBlocks(from sessions: [FocusSession]) -> [TimelineBlock] {
@@ -45,7 +57,8 @@ public struct ReplayEngine: Sendable {
                     end: end,
                     label: session.primaryAppName ?? label(for: session.category),
                     category: session.category,
-                    detail: nil
+                    detail: nil,
+                    kind: .observed
                 )
             }
             .sorted { $0.start < $1.start }
@@ -55,20 +68,41 @@ public struct ReplayEngine: Sendable {
         from sessions: [FocusSession],
         excluding idleIntervals: [(start: Date, end: Date)]
     ) -> [TimelineBlock] {
-        sessions
-            .flatMap { session -> [TimelineBlock] in
-                guard let end = session.end, end > session.start else { return [] }
-                return activeIntervals(from: session.start, to: end, excluding: idleIntervals).map { interval in
-                    TimelineBlock(
-                        start: interval.start,
-                        end: interval.end,
-                        label: session.primaryAppName ?? label(for: session.category),
-                        category: session.category,
-                        detail: nil
-                    )
-                }
+        sessions.flatMap { session in
+            guard let end = session.end, end > session.start else { return [TimelineBlock]() }
+            return activeIntervals(from: session.start, to: end, excluding: idleIntervals).map {
+                TimelineBlock(
+                    start: $0.start,
+                    end: $0.end,
+                    label: session.primaryAppName ?? label(for: session.category),
+                    category: session.category,
+                    kind: .observed
+                )
             }
-            .sorted { $0.start < $1.start }
+        }
+        .sorted { $0.start < $1.start }
+    }
+
+    private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
+        var intervals: [(start: Date, end: Date)] = []
+        var idleStart: Date?
+        for event in events.sorted(by: { $0.timestamp < $1.timestamp }) {
+            switch event.kind {
+            case .idleStart:
+                idleStart = idleStart ?? event.timestamp
+            case .idleEnd:
+                if let idleStart, event.timestamp > idleStart {
+                    intervals.append((idleStart, min(event.timestamp, now)))
+                }
+                idleStart = nil
+            case .appActivated, .browserDomain, .heartbeat:
+                continue
+            }
+        }
+        if let idleStart, now > idleStart {
+            intervals.append((idleStart, now))
+        }
+        return intervals.filter { $0.end > $0.start }
     }
 
     private func activeIntervals(
@@ -77,13 +111,11 @@ public struct ReplayEngine: Sendable {
         excluding idleIntervals: [(start: Date, end: Date)]
     ) -> [(start: Date, end: Date)] {
         var intervals = [(start: start, end: end)]
-
         for idle in idleIntervals {
             intervals = intervals.flatMap { active in
                 let overlapStart = max(active.start, idle.start)
                 let overlapEnd = min(active.end, idle.end)
                 guard overlapEnd > overlapStart else { return [active] }
-
                 var remaining: [(start: Date, end: Date)] = []
                 if active.start < overlapStart {
                     remaining.append((active.start, overlapStart))
@@ -94,74 +126,7 @@ public struct ReplayEngine: Sendable {
                 return remaining
             }
         }
-
         return intervals.filter { $0.end > $0.start }
-    }
-
-    private func eventTimelineBlocks(
-        from events: [ActivityEvent],
-        idleIntervals: [(start: Date, end: Date)],
-        resolver: CategoryResolver,
-        now: Date
-    ) -> [TimelineBlock] {
-        let meaningfulEvents = events
-            .filter { $0.kind == .appActivated || $0.kind == .browserDomain }
-            .sorted { $0.timestamp < $1.timestamp }
-        guard !meaningfulEvents.isEmpty else { return [] }
-
-        return meaningfulEvents.enumerated().flatMap { index, event -> [TimelineBlock] in
-            let nextTimestamp = meaningfulEvents.dropFirst(index + 1).first?.timestamp ?? now
-            guard nextTimestamp > event.timestamp else { return [] }
-
-            return activeIntervals(from: event.timestamp, to: nextTimestamp, excluding: idleIntervals).map { interval in
-                TimelineBlock(
-                    start: interval.start,
-                    end: interval.end,
-                    label: resolver.displayName(for: event),
-                    category: resolver.category(for: event),
-                    detail: event.windowTitle
-                )
-            }
-        }
-        .sorted { $0.start < $1.start }
-    }
-
-    private func idleIntervals(from events: [ActivityEvent], now: Date) -> [(start: Date, end: Date)] {
-        let ordered = events.sorted { $0.timestamp < $1.timestamp }
-        var idleStart: Date?
-        var intervals: [(start: Date, end: Date)] = []
-
-        for event in ordered {
-            switch event.kind {
-            case .idleStart:
-                idleStart = event.timestamp
-            case .idleEnd:
-                if let start = idleStart, event.timestamp > start {
-                    intervals.append((start, event.timestamp))
-                }
-                idleStart = nil
-            case .appActivated, .browserDomain:
-                continue
-            }
-        }
-
-        if let start = idleStart, now > start {
-            intervals.append((start, now))
-        }
-
-        return intervals
-    }
-
-    private func idleTimelineBlocks(from intervals: [(start: Date, end: Date)]) -> [TimelineBlock] {
-        intervals.map { interval in
-            TimelineBlock(
-                start: interval.start,
-                end: interval.end,
-                label: "Idle period",
-                category: .neutral,
-                detail: "No keyboard or mouse input"
-            )
-        }
     }
 
     private func mergeBlocks(_ sortedBlocks: [TimelineBlock]) -> [TimelineBlock] {
@@ -173,7 +138,11 @@ public struct ReplayEngine: Sendable {
 
             let gap = next.start.timeIntervalSince(previous.end)
             let overlaps = next.start < previous.end
-            if previous.category == next.category, previous.label == next.label, gap <= configuration.mergeGap, !overlaps {
+            if previous.kind == next.kind,
+               previous.category == next.category,
+               previous.label == next.label,
+               gap <= configuration.mergeGap,
+               !overlaps {
                 previous.end = max(previous.end, next.end)
                 if let detail = next.detail, previous.detail != detail {
                     previous.detail = [previous.detail, detail].compactMap(\.self).joined(separator: ", ")
@@ -193,12 +162,18 @@ public struct ReplayEngine: Sendable {
         let productiveMinutes = minutes(for: .productive, in: blocks)
         let distractingMinutes = minutes(for: .distracting, in: blocks)
         let idleMinutes = blocks
-            .filter { $0.label == "Idle period" }
+            .filter { $0.kind == .idle }
             .reduce(0) { $0 + minutes(in: $1) }
-        let neutralMinutes = max(0, minutes(for: .neutral, in: blocks) - idleMinutes)
-        let totalMinutes = blocks.reduce(0) { $0 + minutes(in: $1) }
+        let unobservedMinutes = blocks
+            .filter { $0.kind == .unobserved }
+            .reduce(0) { $0 + minutes(in: $1) }
+        let neutralMinutes = blocks
+            .filter { $0.kind == .observed && $0.category == .neutral }
+            .reduce(0) { $0 + minutes(in: $1) }
+        let observedActiveMinutes = productiveMinutes + distractingMinutes + neutralMinutes
+        let totalMinutes = observedActiveMinutes + idleMinutes
 
-        let productiveBlocks = blocks.filter { $0.category == .productive }
+        let productiveBlocks = blocks.filter { $0.kind == .observed && $0.category == .productive }
         let longest = productiveBlocks.max {
             $0.end.timeIntervalSince($0.start) < $1.end.timeIntervalSince($1.start)
         }
@@ -218,6 +193,7 @@ public struct ReplayEngine: Sendable {
             distractingMinutes: distractingMinutes,
             neutralMinutes: neutralMinutes,
             idleMinutes: idleMinutes,
+            unobservedMinutes: unobservedMinutes,
             topActivities: topActivities,
             dataQualityWarnings: dataQualityWarnings
         )
@@ -230,6 +206,7 @@ public struct ReplayEngine: Sendable {
             fragmentedProductiveMinutes: fragmentedProductiveMinutes,
             distractingMinutes: distractingMinutes,
             idleMinutes: idleMinutes,
+            unobservedMinutes: unobservedMinutes,
             totalMinutes: totalMinutes,
             driftEvents: driftEvents,
             longestProductiveBlock: longest,
@@ -251,6 +228,7 @@ public struct ReplayEngine: Sendable {
             codingMinutes: codingMinutes,
             distractingMinutes: distractingMinutes,
             idleMinutes: idleMinutes,
+            unobservedMinutes: unobservedMinutes,
             driftCount: driftEvents.count,
             longestProductiveBlock: longest,
             topDistractions: topDistractions,
@@ -259,6 +237,7 @@ public struct ReplayEngine: Sendable {
 
         return DailyInsightReport(
             totalTrackedMinutes: totalMinutes,
+            observedActiveMinutes: observedActiveMinutes,
             productiveMinutes: productiveMinutes,
             studyLikeMinutes: studyMinutes,
             codingLikeMinutes: codingMinutes,
@@ -267,6 +246,7 @@ public struct ReplayEngine: Sendable {
             distractingMinutes: distractingMinutes,
             neutralMinutes: neutralMinutes,
             idleMinutes: idleMinutes,
+            unobservedMinutes: unobservedMinutes,
             focusScore: focusScore,
             driftCount: driftEvents.count,
             longestProductiveBlockLabel: longest?.label,
@@ -309,7 +289,7 @@ public struct ReplayEngine: Sendable {
 
     private func minutes(for category: FocusCategory, in blocks: [TimelineBlock]) -> Int {
         blocks
-            .filter { $0.category == category }
+            .filter { $0.kind == .observed && $0.category == category }
             .reduce(0) { $0 + minutes(in: $1) }
     }
 
@@ -321,7 +301,7 @@ public struct ReplayEngine: Sendable {
         blocks.enumerated().reduce(0) { total, indexedBlock in
             let index = indexedBlock.offset
             let block = indexedBlock.element
-            guard block.category == .productive else {
+            guard block.kind == .observed, block.category == .productive else {
                 return total
             }
             guard isStudyLike(block) || isStudySupportBlock(block, at: index, in: blocks) else { return total }
@@ -352,7 +332,7 @@ public struct ReplayEngine: Sendable {
         ].compactMap(\.self)
 
         return neighbors.contains { neighbor in
-            guard neighbor.category == .productive, isStudyLike(neighbor) else { return false }
+            guard neighbor.kind == .observed, neighbor.category == .productive, isStudyLike(neighbor) else { return false }
             let gapBefore = max(0, block.start.timeIntervalSince(neighbor.end))
             let gapAfter = max(0, neighbor.start.timeIntervalSince(block.end))
             return min(gapBefore, gapAfter) <= window
@@ -367,7 +347,7 @@ public struct ReplayEngine: Sendable {
         return blocks.reduce(0) { total, block in
             let label = block.label.lowercased()
             let detail = block.detail?.lowercased() ?? ""
-            guard block.category == .productive, codingTerms.contains(where: { label.contains($0) || detail.contains($0) }) else {
+            guard block.kind == .observed, block.category == .productive, codingTerms.contains(where: { label.contains($0) || detail.contains($0) }) else {
                 return total
             }
             return total + minutes(in: block)
@@ -377,7 +357,7 @@ public struct ReplayEngine: Sendable {
     private func deepWorkMinutes(in blocks: [TimelineBlock]) -> Int {
         blocks.reduce(0) { total, block in
             let duration = minutes(in: block)
-            guard block.category == .productive, duration >= 45 else { return total }
+            guard block.kind == .observed, block.category == .productive, duration >= 45 else { return total }
             return total + duration
         }
     }
@@ -385,14 +365,14 @@ public struct ReplayEngine: Sendable {
     private func fragmentedProductiveMinutes(in blocks: [TimelineBlock]) -> Int {
         blocks.reduce(0) { total, block in
             let duration = minutes(in: block)
-            guard block.category == .productive, duration > 0, duration < 25 else { return total }
+            guard block.kind == .observed, block.category == .productive, duration > 0, duration < 25 else { return total }
             return total + duration
         }
     }
 
     private func topDistractionNames(blocks: [TimelineBlock], driftEvents: [DriftEvent]) -> [String] {
         var counts: [String: Int] = [:]
-        for block in blocks where block.category == .distracting {
+        for block in blocks where block.kind == .observed && block.category == .distracting {
             counts[block.label, default: 0] += minutes(in: block)
         }
         for drift in driftEvents {
@@ -411,7 +391,7 @@ public struct ReplayEngine: Sendable {
 
     private func topLabels(for category: FocusCategory, in blocks: [TimelineBlock]) -> [String] {
         var counts: [String: Int] = [:]
-        for block in blocks where block.category == category {
+        for block in blocks where block.kind == .observed && block.category == category {
             counts[block.label, default: 0] += minutes(in: block)
         }
         return counts
@@ -424,21 +404,22 @@ public struct ReplayEngine: Sendable {
     }
 
     private func activityBreakdown(from blocks: [TimelineBlock]) -> [ActivityBreakdownItem] {
-        var totals: [String: (label: String, category: FocusCategory, minutes: Int)] = [:]
+        var totals: [String: (label: String, category: FocusCategory, kind: TimelineBlockKind, minutes: Int)] = [:]
 
         for block in blocks {
             let duration = minutes(in: block)
             guard duration > 0 else { continue }
 
-            let key = "\(block.category.rawValue)|\(block.label.lowercased())"
+            let key = "\(block.kind.rawValue)|\(block.category.rawValue)|\(block.label.lowercased())"
             if let existing = totals[key] {
                 totals[key] = (
                     label: existing.label,
                     category: existing.category,
+                    kind: existing.kind,
                     minutes: existing.minutes + duration
                 )
             } else {
-                totals[key] = (label: block.label, category: block.category, minutes: duration)
+                totals[key] = (label: block.label, category: block.category, kind: block.kind, minutes: duration)
             }
         }
 
@@ -449,7 +430,7 @@ public struct ReplayEngine: Sendable {
             }
             .prefix(8)
             .map {
-                ActivityBreakdownItem(label: $0.label, category: $0.category, minutes: $0.minutes)
+                ActivityBreakdownItem(label: $0.label, category: $0.category, minutes: $0.minutes, kind: $0.kind)
             }
     }
 
@@ -457,7 +438,7 @@ public struct ReplayEngine: Sendable {
         var warnings: [String] = []
 
         let longestActiveBlock = blocks
-            .filter { $0.label != "Idle period" }
+            .filter { $0.kind == .observed }
             .max { lhs, rhs in
                 lhs.end.timeIntervalSince(lhs.start) < rhs.end.timeIntervalSince(rhs.start)
             }
@@ -468,11 +449,19 @@ public struct ReplayEngine: Sendable {
             )
         }
 
-        let totalMinutes = blocks.reduce(0) { $0 + minutes(in: $1) }
-        let idleMinutes = blocks
-            .filter { $0.label == "Idle period" }
+        let totalMinutes = blocks
+            .filter { $0.kind != .unobserved }
             .reduce(0) { $0 + minutes(in: $1) }
-        if totalMinutes >= 8 * 60, idleMinutes == 0 {
+        let idleMinutes = blocks
+            .filter { $0.kind == .idle }
+            .reduce(0) { $0 + minutes(in: $1) }
+        let unobservedMinutes = blocks
+            .filter { $0.kind == .unobserved }
+            .reduce(0) { $0 + minutes(in: $1) }
+        if unobservedMinutes >= 10 {
+            warnings.append("\(formatMinutes(unobservedMinutes)) was not assigned to an app because the collector had no fresh signal. Life Replay excludes it from the focus score.")
+        }
+        if totalMinutes >= 8 * 60, idleMinutes == 0, unobservedMinutes == 0 {
             warnings.append("No idle/away time was recorded across a long tracked day; this may mean the app was not running through sleep/wake yet.")
         }
 
@@ -486,6 +475,7 @@ public struct ReplayEngine: Sendable {
         distractingMinutes: Int,
         neutralMinutes: Int,
         idleMinutes: Int,
+        unobservedMinutes: Int,
         topActivities: [ActivityBreakdownItem],
         dataQualityWarnings: [String]
     ) -> [String] {
@@ -493,7 +483,7 @@ public struct ReplayEngine: Sendable {
         let activeMinutes = max(0, totalMinutes - idleMinutes)
 
         if !dataQualityWarnings.isEmpty {
-            suggestions.append("Run Repair Sleep Gaps before judging today's focus score.")
+            suggestions.append("Review the accuracy notes before judging today's focus score; unobserved time is intentionally not assigned to an app.")
         }
 
         if activeMinutes > 0, Double(neutralMinutes) / Double(activeMinutes) >= 0.35 {
@@ -525,6 +515,7 @@ public struct ReplayEngine: Sendable {
         fragmentedProductiveMinutes: Int,
         distractingMinutes: Int,
         idleMinutes: Int,
+        unobservedMinutes: Int,
         totalMinutes: Int,
         driftEvents: [DriftEvent],
         longestProductiveBlock: TimelineBlock?,
@@ -537,8 +528,9 @@ public struct ReplayEngine: Sendable {
             return ["No meaningful activity was tracked yet; leave collection running during a real session."]
         }
 
-        let productiveShare = Double(productiveMinutes) / Double(max(1, totalMinutes))
-        let distractingShare = Double(distractingMinutes) / Double(max(1, totalMinutes))
+        let activeMinutes = productiveMinutes + distractingMinutes + max(0, totalMinutes - productiveMinutes - distractingMinutes - idleMinutes)
+        let productiveShare = Double(productiveMinutes) / Double(max(1, activeMinutes))
+        let distractingShare = Double(distractingMinutes) / Double(max(1, activeMinutes))
 
         if let primary = topProductiveLabels.first, productiveMinutes > 0 {
             insights.append("The main productive thread was \(primary), accounting for the largest visible work block.")
@@ -588,6 +580,10 @@ public struct ReplayEngine: Sendable {
             insights.append("There was \(formatMinutes(idleMinutes)) of idle time; if that was intentional rest, it should be treated differently from distraction.")
         }
 
+        if unobservedMinutes >= 10 {
+            insights.append("\(formatMinutes(unobservedMinutes)) was left unassigned because Life Replay did not have enough evidence to say what happened.")
+        }
+
         if focusScore < 50 {
             insights.append("Focus score was low; tomorrow's target should be one protected session before opening distracting sites.")
         }
@@ -602,6 +598,7 @@ public struct ReplayEngine: Sendable {
         codingMinutes: Int,
         distractingMinutes: Int,
         idleMinutes: Int,
+        unobservedMinutes: Int,
         driftCount: Int,
         longestProductiveBlock: TimelineBlock?,
         topDistractions: [String],
@@ -617,8 +614,11 @@ public struct ReplayEngine: Sendable {
             : " No explicit distracting block was detected."
         let driftText = driftCount == 0 ? " No focus drift was detected." : " Focus drift showed up \(driftCount) time\(driftCount == 1 ? "" : "s")."
         let idleText = idleMinutes > 0 ? " Idle/away time was \(formatMinutes(idleMinutes))." : ""
+        let unobservedText = unobservedMinutes > 0
+            ? " \(formatMinutes(unobservedMinutes)) was unobserved and excluded from the score."
+            : ""
 
-        return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(codingText)\(distractionText)\(driftText)\(bestBlock)\(idleText) Focus score: \(focusScore)/100. Next: \(nextAction)"
+        return "You logged \(formatMinutes(productiveMinutes)) of productive time today.\(studyText)\(codingText)\(distractionText)\(driftText)\(bestBlock)\(idleText)\(unobservedText) Focus score: \(focusScore)/100. Next: \(nextAction)"
     }
 
     private func nextAction(
@@ -655,16 +655,19 @@ public struct ActivityBreakdownItem: Codable, Equatable, Sendable {
     public var label: String
     public var category: FocusCategory
     public var minutes: Int
+    public var kind: TimelineBlockKind
 
-    public init(label: String, category: FocusCategory, minutes: Int) {
+    public init(label: String, category: FocusCategory, minutes: Int, kind: TimelineBlockKind = .observed) {
         self.label = label
         self.category = category
         self.minutes = minutes
+        self.kind = kind
     }
 }
 
 public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var totalTrackedMinutes: Int
+    public var observedActiveMinutes: Int
     public var productiveMinutes: Int
     public var studyLikeMinutes: Int
     public var codingLikeMinutes: Int
@@ -673,6 +676,7 @@ public struct DailyInsightReport: Codable, Equatable, Sendable {
     public var distractingMinutes: Int
     public var neutralMinutes: Int
     public var idleMinutes: Int
+    public var unobservedMinutes: Int
     public var focusScore: Int
     public var driftCount: Int
     public var longestProductiveBlockLabel: String?

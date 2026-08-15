@@ -10,7 +10,8 @@ struct FocusSettingsTests {
             sessionMinimumDurationSeconds: 45,
             driftWindowMinutes: 8,
             baselineSwitchesPerHour: 10,
-            productiveSessionMinimumMinutes: 4
+            productiveSessionMinimumMinutes: 4,
+            maximumObservationGapSeconds: 75
         )
 
         let configuration = settings.focusEngineConfiguration
@@ -20,5 +21,6 @@ struct FocusSettingsTests {
         #expect(configuration.driftWindow == 480)
         #expect(configuration.defaultBaselineSwitchesPerHour == 10)
         #expect(configuration.productiveSessionMinimumDuration == 240)
+        #expect(configuration.maximumObservedGap == 75)
     }
 }

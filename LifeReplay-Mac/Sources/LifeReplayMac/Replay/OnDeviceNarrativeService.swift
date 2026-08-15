@@ -17,7 +17,7 @@ struct OnDeviceNarrativeService {
 
     func generate(
         blocks: [TimelineBlock],
-        driftEvents: [DriftEvent],
+        driftEvents: [LifeReplayCore.DriftEvent],
         focusScore: Int,
         fallback: String
     ) async -> NarrativeResult {
@@ -39,7 +39,7 @@ struct OnDeviceNarrativeService {
     @available(macOS 26.0, *)
     private func generateWithFoundationModels(
         blocks: [TimelineBlock],
-        driftEvents: [DriftEvent],
+        driftEvents: [LifeReplayCore.DriftEvent],
         focusScore: Int,
         fallback: String
     ) async -> NarrativeResult {
@@ -70,7 +70,7 @@ struct OnDeviceNarrativeService {
     }
     #endif
 
-    private func prompt(blocks: [TimelineBlock], driftEvents: [DriftEvent], focusScore: Int) -> String {
+    private func prompt(blocks: [TimelineBlock], driftEvents: [LifeReplayCore.DriftEvent], focusScore: Int) -> String {
         let timelineLines = blocks.prefix(12).map { block in
             let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
             return "- \(block.label), \(minutes)m, \(block.category.rawValue)"

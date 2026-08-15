@@ -20,12 +20,22 @@ struct FocusProtectionEngineTests {
                 appBundleID: "com.microsoft.VSCode",
                 appName: "VS Code"
             ),
+            ActivityEvent(timestamp: start.addingTimeInterval(60), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(120), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(180), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(240), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(300), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(360), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
+            ActivityEvent(timestamp: start.addingTimeInterval(420), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
             ActivityEvent(
                 timestamp: start.addingTimeInterval(8 * 60),
                 kind: .appActivated,
                 appBundleID: "com.apple.Terminal",
                 appName: "Terminal"
             ),
+            ActivityEvent(timestamp: start.addingTimeInterval(9 * 60), kind: .heartbeat, appBundleID: "com.apple.Terminal", appName: "Terminal"),
+            ActivityEvent(timestamp: start.addingTimeInterval(10 * 60), kind: .heartbeat, appBundleID: "com.apple.Terminal", appName: "Terminal"),
+            ActivityEvent(timestamp: start.addingTimeInterval(11 * 60), kind: .heartbeat, appBundleID: "com.apple.Terminal", appName: "Terminal"),
             trigger,
         ]
 

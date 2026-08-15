@@ -5,7 +5,7 @@ public struct ActivityRepairConfiguration: Sendable {
     public var idleStartOffset: TimeInterval
 
     public init(
-        minimumGapToRepair: TimeInterval = 30 * 60,
+        minimumGapToRepair: TimeInterval = 2 * 60 * 60,
         idleStartOffset: TimeInterval = 90
     ) {
         self.minimumGapToRepair = minimumGapToRepair
@@ -30,6 +30,9 @@ public struct ActivityRepairEngine: Sendable {
             let previous = pair.0
             let next = pair.1
             let gap = next.timestamp.timeIntervalSince(previous.timestamp)
+            // A missing signal is not proof that the user slept. Only repair
+            // genuinely long gaps, where treating the interval as away time is
+            // safer than silently charging it to the last visible app.
             guard gap >= configuration.minimumGapToRepair else { continue }
             guard previous.kind != .idleStart, previous.kind != .idleEnd else { continue }
             guard next.kind != .idleStart, next.kind != .idleEnd else { continue }
@@ -43,13 +46,13 @@ public struct ActivityRepairEngine: Sendable {
             repairs.append(ActivityEvent(
                 timestamp: idleStart,
                 kind: .idleStart,
-                appName: "Inferred sleep/away",
+                appName: "Inferred away/sleep",
                 source: "mac-repair"
             ))
             repairs.append(ActivityEvent(
                 timestamp: next.timestamp,
                 kind: .idleEnd,
-                appName: "Inferred wake/return",
+                appName: "Inferred return",
                 source: "mac-repair"
             ))
         }

@@ -4,13 +4,16 @@ import Foundation
 import LifeReplayCore
 import OSLog
 
+private typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
+
 @MainActor
 final class MacActivityCollector {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "ActivityCollector")
     private let idleThreshold: TimeInterval
     private let timerInterval: TimeInterval = 5
+    private let heartbeatInterval: TimeInterval = 15
     private let suspensionGapThreshold: TimeInterval
-    private let onEvent: (ActivityEvent) -> Void
+    private let onEvent: (CoreActivityEvent) -> Void
     private let browserDomainReader = BrowserDomainReader()
     private let windowTitleReader = WindowTitleReader()
     private var observers: [NSObjectProtocol] = []
@@ -20,10 +23,11 @@ final class MacActivityCollector {
     private var lastBrowserDomain: String?
     private var lastBrowserDomainBundleID: String?
     private var lastIdlePollAt: Date?
+    private var lastActiveEvidenceAt: Date?
 
     private(set) var isRunning = false
 
-    init(idleThreshold: TimeInterval = 90, onEvent: @escaping (ActivityEvent) -> Void) {
+    init(idleThreshold: TimeInterval = 90, onEvent: @escaping (CoreActivityEvent) -> Void) {
         self.idleThreshold = idleThreshold
         self.suspensionGapThreshold = max(5 * 60, idleThreshold * 2)
         self.onEvent = onEvent
@@ -112,6 +116,7 @@ final class MacActivityCollector {
         lastBrowserDomain = nil
         lastBrowserDomainBundleID = nil
         lastIdlePollAt = nil
+        lastActiveEvidenceAt = nil
 
         logger.info("Mac activity collector stopped")
     }
@@ -129,7 +134,7 @@ final class MacActivityCollector {
     private func recordApplication(bundleIdentifier: String?, appName: String?, processIdentifier: pid_t?, timestamp: Date) {
         frontmostBundleIdentifier = bundleIdentifier
         let windowTitle = windowTitleReader.frontWindowTitle(processIdentifier: processIdentifier)
-        let event = ActivityEvent(
+        let event = CoreActivityEvent(
             timestamp: timestamp,
             kind: .appActivated,
             appBundleID: bundleIdentifier,
@@ -138,6 +143,7 @@ final class MacActivityCollector {
         )
         logger.debug("Activated app: \(event.appName ?? "Unknown", privacy: .public)")
         onEvent(event)
+        lastActiveEvidenceAt = timestamp
         _ = recordBrowserDomainIfAvailable(bundleIdentifier: bundleIdentifier, timestamp: timestamp)
     }
 
@@ -149,15 +155,17 @@ final class MacActivityCollector {
         let seconds = secondsSinceRecentInput()
         if seconds >= idleThreshold, !isIdle {
             isIdle = true
-            onEvent(ActivityEvent(timestamp: now, kind: .idleStart))
+            onEvent(CoreActivityEvent(timestamp: now, kind: .idleStart))
             logger.info("Idle started after \(seconds, format: .fixed(precision: 1)) seconds")
         } else if seconds < idleThreshold, isIdle {
             isIdle = false
-            onEvent(ActivityEvent(timestamp: now, kind: .idleEnd))
+            onEvent(CoreActivityEvent(timestamp: now, kind: .idleEnd))
             logger.info("Idle ended")
         }
 
+        guard !isIdle else { return }
         _ = recordBrowserDomainIfAvailable(bundleIdentifier: frontmostBundleIdentifier, timestamp: now)
+        recordHeartbeatIfNeeded(at: now)
     }
 
     private func recordSuspensionGapIfNeeded(now: Date) {
@@ -169,8 +177,8 @@ final class MacActivityCollector {
         guard inferredStart < now else { return }
 
         if !isIdle {
-            onEvent(ActivityEvent(timestamp: inferredStart, kind: .idleStart, appName: "Mac sleep"))
-            onEvent(ActivityEvent(timestamp: now, kind: .idleEnd, appName: "Mac wake"))
+            onEvent(CoreActivityEvent(timestamp: inferredStart, kind: .idleStart, appName: "Mac sleep"))
+            onEvent(CoreActivityEvent(timestamp: now, kind: .idleEnd, appName: "Mac wake"))
             logger.info("Recorded inferred sleep/away interval after timer gap of \(elapsed, format: .fixed(precision: 1)) seconds")
         }
     }
@@ -178,7 +186,8 @@ final class MacActivityCollector {
     private func recordSystemSleep() {
         guard !isIdle else { return }
         isIdle = true
-        onEvent(ActivityEvent(timestamp: Date(), kind: .idleStart, appName: "Mac sleep"))
+        lastActiveEvidenceAt = nil
+        onEvent(CoreActivityEvent(timestamp: Date(), kind: .idleStart, appName: "Mac sleep"))
         logger.info("Idle started because macOS is going to sleep")
     }
 
@@ -186,7 +195,7 @@ final class MacActivityCollector {
         guard isIdle else { return }
         isIdle = false
         let timestamp = Date()
-        onEvent(ActivityEvent(timestamp: timestamp, kind: .idleEnd, appName: "Mac wake"))
+        onEvent(CoreActivityEvent(timestamp: timestamp, kind: .idleEnd, appName: "Mac wake"))
         logger.info("Idle ended because macOS woke")
 
         if let app = NSWorkspace.shared.frontmostApplication {
@@ -221,7 +230,7 @@ final class MacActivityCollector {
         lastBrowserDomain = domain
         lastBrowserDomainBundleID = bundleIdentifier
 
-        let event = ActivityEvent(
+        let event = CoreActivityEvent(
             timestamp: timestamp,
             kind: .browserDomain,
             appBundleID: bundleIdentifier,
@@ -229,6 +238,36 @@ final class MacActivityCollector {
         )
         logger.debug("Browser domain: \(domain, privacy: .public)")
         onEvent(event)
+        lastActiveEvidenceAt = timestamp
         return domain
+    }
+
+    private func recordHeartbeatIfNeeded(at timestamp: Date) {
+        guard let lastActiveEvidenceAt,
+              timestamp.timeIntervalSince(lastActiveEvidenceAt) >= heartbeatInterval,
+              let app = NSWorkspace.shared.frontmostApplication
+        else { return }
+
+        if app.bundleIdentifier != frontmostBundleIdentifier {
+            recordApplication(
+                bundleIdentifier: app.bundleIdentifier,
+                appName: app.localizedName,
+                processIdentifier: app.processIdentifier,
+                timestamp: timestamp
+            )
+            return
+        }
+
+        let domain = browserDomainReader.domainForFrontmostBrowser(bundleIdentifier: app.bundleIdentifier)
+        let event = CoreActivityEvent(
+            timestamp: timestamp,
+            kind: .heartbeat,
+            appBundleID: app.bundleIdentifier,
+            appName: app.localizedName,
+            windowTitle: windowTitleReader.frontWindowTitle(processIdentifier: app.processIdentifier),
+            browserDomain: domain
+        )
+        onEvent(event)
+        self.lastActiveEvidenceAt = timestamp
     }
 }

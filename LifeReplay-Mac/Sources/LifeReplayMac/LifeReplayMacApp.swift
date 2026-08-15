@@ -175,7 +175,7 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         Calendar.current.startOfDay(for: date).formatted(.iso8601.year().month().day())
     }
 
-    private func maybeSendFocusProtectionAlert(for event: ActivityEvent) {
+    private func maybeSendFocusProtectionAlert(for event: LifeReplayCore.ActivityEvent) {
         guard let store else { return }
         let now = Date()
         if let lastFocusProtectionNotificationAt,

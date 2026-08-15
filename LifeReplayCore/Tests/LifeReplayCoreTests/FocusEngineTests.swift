@@ -9,6 +9,11 @@ struct FocusEngineTests {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(60), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(120), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(180), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(240), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(300), app: "VS Code", bundle: "com.microsoft.VSCode"),
             event(start.addingTimeInterval(6 * 60), app: "Terminal", bundle: "com.apple.Terminal"),
             event(start.addingTimeInterval(6 * 60 + 30), domain: "twitter.com"),
             event(start.addingTimeInterval(6 * 60 + 60), app: "Safari", bundle: "com.apple.Safari"),
@@ -30,10 +35,36 @@ struct FocusEngineTests {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(60), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(120), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(180), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(240), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(300), app: "VS Code", bundle: "com.microsoft.VSCode"),
             event(start.addingTimeInterval(6 * 60), app: "Terminal", bundle: "com.apple.Terminal"),
             event(start.addingTimeInterval(6 * 60 + 30), app: "Mail", bundle: "com.apple.mail"),
             event(start.addingTimeInterval(6 * 60 + 60), app: "Calendar", bundle: "com.apple.iCal"),
             event(start.addingTimeInterval(6 * 60 + 90), app: "Messages", bundle: "com.apple.MobileSMS"),
+        ]
+
+        let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
+        let analysis = engine.analyze(events: events)
+
+        #expect(analysis.driftEvents.isEmpty)
+    }
+
+    @Test("does not double count app activation and browser capture for one switch")
+    func doesNotDoubleCountSameTimestampBrowserCapture() {
+        let start = Date(timeIntervalSince1970: 0)
+        let triggerTime = start.addingTimeInterval(6 * 60)
+        let events = [
+            event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(60), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(120), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(180), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(240), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(300), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            event(triggerTime, app: "Safari", bundle: "com.apple.Safari"),
+            event(triggerTime, domain: "twitter.com"),
         ]
 
         let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
@@ -62,14 +93,24 @@ struct FocusEngineTests {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(60), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(120), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(180), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(240), app: "VS Code", bundle: "com.microsoft.VSCode"),
             ActivityEvent(timestamp: start.addingTimeInterval(300), kind: .idleStart),
             ActivityEvent(timestamp: start.addingTimeInterval(600), kind: .idleEnd),
+            heartbeat(start.addingTimeInterval(660), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(720), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(780), app: "VS Code", bundle: "com.microsoft.VSCode"),
+            heartbeat(start.addingTimeInterval(840), app: "VS Code", bundle: "com.microsoft.VSCode"),
             event(start.addingTimeInterval(900), app: "Terminal", bundle: "com.apple.Terminal"),
         ]
 
         let analysis = FocusEngine().analyze(events: events)
 
-        #expect(analysis.sessions.first?.idleSeconds == 300)
+        #expect(analysis.sessions.first?.idleSeconds == 0)
+        #expect(analysis.sessions.first?.end == start.addingTimeInterval(300))
+        #expect(analysis.sessions.first.map { $0.end!.timeIntervalSince($0.start) } == 300)
     }
 }
 
@@ -80,5 +121,14 @@ private func event(_ timestamp: Date, app: String? = nil, bundle: String? = nil,
         appBundleID: bundle,
         appName: app,
         browserDomain: domain
+    )
+}
+
+private func heartbeat(_ timestamp: Date, app: String, bundle: String) -> ActivityEvent {
+    ActivityEvent(
+        timestamp: timestamp,
+        kind: .heartbeat,
+        appBundleID: bundle,
+        appName: app
     )
 }

@@ -69,7 +69,7 @@ final class ReplayHistoryWindowController: NSWindowController {
         ])
     }
 
-    private func renderReplay(_ replay: DailyReplay) -> String {
+    private func renderReplay(_ replay: LifeReplayCore.DailyReplay) -> String {
         let blocks = (try? ReplayEngine().decodeBlocks(from: replay.timelineBlocksJSON)) ?? []
         var lines: [String] = [
             replay.date.formatted(date: .long, time: .omitted),
