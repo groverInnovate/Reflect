@@ -79,6 +79,9 @@ final class LifeReplayStore {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "Store")
     private let container: ModelContainer
     private let context: ModelContext
+    private var cachedBaselineDay: Date?
+    private var cachedBaselineEvents: [CoreActivityEvent] = []
+    private var cachedCategorySeeds: [AppCategorySeed]?
 
     init() throws {
         let schema = Schema([
@@ -245,6 +248,9 @@ final class LifeReplayStore {
     private func baselineEvents(now: Date) -> [CoreActivityEvent] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: now)
+        if cachedBaselineDay == today {
+            return cachedBaselineEvents
+        }
         let start = calendar.date(byAdding: .day, value: -14, to: today) ?? today
         let predicate = #Predicate<ActivityEvent> { event in
             event.timestamp >= start && event.timestamp < today
@@ -254,7 +260,10 @@ final class LifeReplayStore {
             sortBy: [SortDescriptor(\ActivityEvent.timestamp, order: .forward)]
         )
         do {
-            return try context.fetch(descriptor).map(\.coreValue)
+            let events = try context.fetch(descriptor).map(\.coreValue)
+            cachedBaselineDay = today
+            cachedBaselineEvents = events
+            return events
         } catch {
             logger.error("Failed to fetch baseline events: \(error.localizedDescription, privacy: .public)")
             return []
@@ -492,9 +501,14 @@ final class LifeReplayStore {
     }
 
     func categorySeeds() -> [AppCategorySeed] {
-        categories().map {
+        if let cachedCategorySeeds {
+            return cachedCategorySeeds
+        }
+        let seeds = categories().map {
             AppCategorySeed($0.matchPattern, $0.displayName, $0.category)
         }
+        cachedCategorySeeds = seeds
+        return seeds
     }
 
     func makeFocusEngine() -> FocusEngine {
@@ -565,6 +579,7 @@ final class LifeReplayStore {
 
         do {
             try context.save()
+            cachedCategorySeeds = nil
             _ = refreshTodayAnalysis()
         } catch {
             logger.error("Failed to replace app categories: \(error.localizedDescription, privacy: .public)")

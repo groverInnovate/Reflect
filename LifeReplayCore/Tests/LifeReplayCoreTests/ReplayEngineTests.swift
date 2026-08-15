@@ -134,7 +134,7 @@ struct ReplayEngineTests {
     func longSilentGapBecomesUnobserved() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
-            ActivityEvent(timestamp: start, kind: .appActivated, appName: "VS Code"),
+            ActivityEvent(timestamp: start, kind: .appActivated, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
         ]
 
         let blocks = ReplayEngine().timelineBlocks(

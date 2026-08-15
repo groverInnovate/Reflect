@@ -43,12 +43,14 @@ final class LifeReplayMacApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let self else { return }
         self.store?.record(event)
         self.maybeSendFocusProtectionAlert(for: event)
-        self.eventCount = self.store?.eventsForToday().count ?? self.eventCount + 1
+        self.eventCount += 1
         let newDrifts = self.store?.refreshTodayAnalysis().newDrifts ?? []
         for drift in newDrifts {
             self.notifications.notify(driftEvent: drift)
         }
-        self.dashboard?.reload()
+        if self.dashboard?.window?.isVisible == true {
+            self.dashboard?.reload()
+        }
         self.updateMenu()
     }
 
