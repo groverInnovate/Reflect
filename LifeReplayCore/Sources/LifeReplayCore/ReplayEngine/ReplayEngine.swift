@@ -138,15 +138,14 @@ public struct ReplayEngine: Sendable {
 
             let gap = next.start.timeIntervalSince(previous.end)
             let overlaps = next.start < previous.end
+            let sameContext = previous.detail == next.detail
             if previous.kind == next.kind,
                previous.category == next.category,
                previous.label == next.label,
+               sameContext,
                gap <= configuration.mergeGap,
                !overlaps {
                 previous.end = max(previous.end, next.end)
-                if let detail = next.detail, previous.detail != detail {
-                    previous.detail = [previous.detail, detail].compactMap(\.self).joined(separator: ", ")
-                }
                 blocks[blocks.count - 1] = previous
             } else {
                 blocks.append(next)

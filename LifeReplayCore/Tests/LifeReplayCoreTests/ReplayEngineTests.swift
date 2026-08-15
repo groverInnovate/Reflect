@@ -130,6 +130,24 @@ struct ReplayEngineTests {
         )))
     }
 
+    @Test("window-title changes remain separate task contexts")
+    func windowTitleChangesRemainSeparateContexts() {
+        let start = Date(timeIntervalSince1970: 0)
+        let events = [
+            ActivityEvent(timestamp: start, kind: .appActivated, appBundleID: "com.microsoft.VSCode", appName: "Visual Studio Code", windowTitle: "hive - main.rs"),
+            ActivityEvent(timestamp: start.addingTimeInterval(60), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "Visual Studio Code", windowTitle: "hive - main.rs"),
+            ActivityEvent(timestamp: start.addingTimeInterval(120), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "Visual Studio Code", windowTitle: "lean-sim - README.md"),
+            ActivityEvent(timestamp: start.addingTimeInterval(180), kind: .heartbeat, appBundleID: "com.microsoft.VSCode", appName: "Visual Studio Code", windowTitle: "lean-sim - README.md"),
+        ]
+
+        let blocks = ReplayEngine().timelineBlocks(from: [], events: events, now: start.addingTimeInterval(240))
+
+        #expect(blocks.count == 2)
+        #expect(blocks[0].detail == "hive - main.rs")
+        #expect(blocks[1].detail == "lean-sim - README.md")
+        #expect(blocks.reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) } == 4)
+    }
+
     @Test("does not assign a long silent gap to the previous app")
     func longSilentGapBecomesUnobserved() {
         let start = Date(timeIntervalSince1970: 0)
