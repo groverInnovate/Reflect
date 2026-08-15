@@ -53,15 +53,20 @@ Primary references:
       remembering this chat.
 - [x] Export enough debug data to diagnose inaccurate days without touching the
       database manually.
+- [x] Remove the daily event fetch cap so long days are not silently truncated.
+- [x] Bound every active interval with heartbeat evidence and expose unobserved
+      time instead of attributing stale gaps to the last app.
+- [x] Keep SwiftData at the Mac boundary while preserving the existing entity names
+      for local-store continuity.
 
 ### P1 - Maximum User Benefit
 
-- [ ] Improve the Daily Review copy until it reads like a useful end-of-day journal:
+- [x] Improve the Daily Review copy until it reads like a useful end-of-day journal:
       what happened, what mattered, what was suspicious, and tomorrow's one action.
 - [x] Make calibration loops obvious: top neutral items should become suggested
       category edits.
 - [ ] Add a final manual QA checklist for one real 90-minute work/study session.
-- [ ] Make README limitation language honest: Life Replay observes frontmost and
+- [x] Make README limitation language honest: Life Replay observes frontmost and
       sampled browser activity; split-screen context is inferred, not magically
       measured per visible pane.
 
@@ -92,3 +97,9 @@ Run the signed app for a real study/coding block, then verify:
 6. A distracting app/domain after sustained work triggers a notification if
    notifications are allowed.
 7. Exported Markdown and CSV files contain enough context to debug mistakes.
+
+The current development host does not have a full Xcode installation, so the final
+signed-app launch, permission prompts, and real 90-minute session are still manual
+acceptance checks for Mohit. The core target builds with the repository-local module
+cache; the full package test command cannot run here because Swift Testing and
+SwiftData macro plugins are missing from the available Command Line Tools image.
