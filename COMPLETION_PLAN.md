@@ -1,16 +1,16 @@
 # Remaining acceptance work
 
-The app is now Mac-only. The old companion, HealthKit, AI, reminder, mentor, and
-weekly-score plans are cancelled. Do not treat them as backlog.
+The app is Mac-only. Debug and Release production builds now pass with Xcode 27.
+Native XCTest, existing-store preservation, live collection/pause/resume, historical
+report interactions, dark appearance, and production CSV accounting are verified.
+See PRODUCTION_VERIFICATION.md for the exact checks.
 
-1. Install/select full Xcode so SwiftData macros can compile the production target.
-2. Run `scripts/test-core.sh` under Xcode's toolchain, then `scripts/build-mac-app.sh`.
-3. Verify an existing SwiftData store upgrades without losing raw activity/categories.
-4. Grant Automation for used browsers and Accessibility if window titles are desired.
-5. Track a timed work session, idle, sleep/wake, pause/resume, and a midnight boundary.
-6. Compare exported seconds to the session and confirm the report is useful for planning.
-7. Check the dashboard at minimum width, in dark mode, and with a full day's timeline.
+1. Approve Accessibility and verify captured window/project titles.
+2. Check minimum-width layout, category editing/save, and tracking settings/save.
+3. Complete a CSV export through the macOS save dialog; the underlying exporter passed,
+   but UI automation could not reliably complete this dialog interaction.
+4. Check real idle, sleep/lock/wake, a live midnight crossing, and a timed work session.
+5. Compare the full-day report with memory and confirm it helps plan the next day.
 
-No paid program, physical iPhone, Apple Watch, capability probe, or external service
-is required for any of this work. OS permission approvals and the real-day judgment
-remain human-owned checks.
+Do not restore companion devices, HealthKit, AI, reminders, coaching, or weekly scores.
+No paid signing membership, external service, iPhone, or Apple Watch is needed.

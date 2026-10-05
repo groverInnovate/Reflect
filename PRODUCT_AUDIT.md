@@ -30,15 +30,18 @@ change their schedule. Evidence and usable time breakdowns take priority over ad
 - Reports carry supported state across midnight and clip intervals to the requested day.
 - The build script now actually builds before packaging, preventing stale binaries.
 
-## Verification and limits
+## Verification and limits — updated after Xcode installation
 
-33 core tests pass through the portable runner using the same XCTest fixtures.
-Swift 6 type checking passes for the UI, app entry point, collectors, and launch-at-login
-against a temporary persistence interface. The actual native dashboard was launched
-with sample data and visually inspected; app-filter selection was observed working.
-The UI automation service could not scroll the preview reliably, so that interaction
-has not been fully verified.
+All 33 core fixtures pass under native XCTest. Production Debug and Release targets
+build with Xcode 27; the optimized signed app launches against the existing store.
+A pre-launch backup comparison confirmed the old activity/categories/sessions/drifts/
+replays were retained; migration added only the expected missing settings default.
+Historical reports, filtering, timeline scrolling, and native dark appearance were
+inspected. Live app/domain/heartbeat observations and pause/resume boundaries were
+checked in the database. The production CSV exporter passed an actual-store accounting
+check. Export presentation was changed to an asynchronous save dialog.
 
-The production SwiftData build remains blocked by absent full Xcode/SwiftData macros.
-Existing-store migration and real permission/timing checks remain required. Sampling,
-idle heuristics, and foreground-only observation put practical bounds on accuracy.
+Accessibility/window-title approval, idle/sleep/lock/wake, minimum-width and edit/save
+interactions, complete CSV dialog interaction, a real midnight crossing, and human
+full-day accuracy judgment remain open. See PRODUCTION_VERIFICATION.md. Sampling,
+idle heuristics, and foreground-only observation still bound practical accuracy.

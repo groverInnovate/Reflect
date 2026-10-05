@@ -24,7 +24,7 @@ Command Line Tools alone lacks the SwiftData compiler plugin needed by this app.
 open .build/LifeReplayMac.app
 ```
 
-The script builds the executable before packaging it, then signs the local bundle
+The script builds an optimized Release executable before packaging it, then signs the local bundle
 ad hoc. It reports a toolchain error rather than bundling an old executable. Keep
 this app at a stable path when granting permissions. Optional launch-at-login is
 under Tracking Settings; macOS may ask for approval in Login Items.
@@ -67,4 +67,6 @@ Before calling the app finished, build it with full Xcode and verify on the Mac:
 4. Edit a website's category and verify current and historical reports update.
 5. Open an existing store, restart the app, and check the midnight/day boundaries.
 
-Current automated verification and remaining device checks are in PROGRESS.md.
+Production builds, existing-store preservation, live pause/resume and collection, and CSV
+accounting have been verified. Remaining OS-session and permission checks are listed in
+PRODUCTION_VERIFICATION.md and PROGRESS.md.

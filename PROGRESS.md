@@ -8,11 +8,11 @@ Historical implementation notes remain available in git history and DECISIONS.md
 
 ## Phase checklist
 
-- [ ] Phase 0 — Mac project and local persistence setup
+- [x] Phase 0 — Mac project and local persistence setup
   - [x] Mac/Core package layout, local SwiftData implementation, stable bundle script
   - [x] Mac-only target and updated agent/product documentation
   - [x] Legacy SwiftData entity names preserved, CloudKit explicitly disabled
-  - [ ] Production build and store initialization verified with full Xcode
+  - [x] Production build and store initialization verified with full Xcode
 - [ ] Phase 1 — Accurate collection
   - [x] App activation, five-second idle/domain polling, 15-second heartbeats
   - [x] Explicit pause/quit boundaries, fresh context on idle recovery
@@ -26,7 +26,7 @@ Historical implementation notes remain available in git history and DECISIONS.md
   - [x] App attribution expires after 30 seconds in Mac reporting
   - [x] Unknown gaps remain unknown; no gap-filling timeline merges
   - [x] Hourly buckets, midnight carry/clipping, secondary focus-break evidence
-  - [x] 33 core regression tests pass through the portable XCTest-fixture runner
+  - [x] 33 core regression tests pass under native XCTest (portable runner also supported)
 - [ ] Phase 3 — Native dashboard
   - [x] Time totals, hourly chart, ranked apps/sites, timeline
   - [x] Date navigation, category editor, search/filter, exact-seconds CSV
@@ -34,29 +34,31 @@ Historical implementation notes remain available in git history and DECISIONS.md
   - [x] Swift 6 type checking against a temporary store interface
   - [x] Actual SwiftUI sample-data window launched and visually inspected
   - [x] App filtering observed working in the preview
-  - [ ] Production dashboard interaction, full-day scrolling, dark/minimum-width checks
+  - [x] Production historical date/filter/scroll interactions and dark appearance
+  - [ ] Minimum-width, category/settings save, and full export-dialog interactions
 - [ ] Phase 4 — Production acceptance
-  - [ ] Full production SwiftData build and launch
-  - [ ] Existing-store migration verified
+  - [x] Full production SwiftData build and launch (Debug and Release)
+  - [x] Existing-store migration verified against a pre-launch backup
   - [ ] Browser/Accessibility permissions verified on the running production app
   - [ ] Timed session, pause/resume, sleep/wake, midnight and historical-report checks
   - [ ] Mohit's real-day accuracy/usefulness judgment
 
-## Verification details
+## Verification details — updated after Xcode installation
 
-- `scripts/test-core.sh`: 33 fixtures pass; XCTest itself is absent in the installed
-  Command Line Tools, so the same fixture bodies run through the portable adapter.
-- UI/app/collector Swift 6 type checking passes against a temporary store stub.
-  This does not verify production persistence.
-- A temporary native preview with explicitly labeled sample data launched and was
-  visually reviewed. No sample data is included in the shipping target.
-- UI automation's scroll call returned `noWindowsAvailable`; filtered selection was
-  confirmed through the updated accessibility tree, but scrolling is still unchecked.
-- `scripts/build-mac-app.sh`: stops clearly because full Xcode is absent. Earlier
-  compile attempts confirm the missing `SwiftDataMacros` compiler plugin.
-- Both shell scripts pass `bash -n`; core and UI checks are independent of paid services.
+- Xcode 27.0 is selected. All 33 core fixtures pass under native XCTest.
+- Production Debug and Release builds compile; the optimized ad-hoc-signed app launches.
+- Existing database rows were preserved; the expected observation-gap default was
+  added during migration. A private pre-launch backup was retained.
+- Live app/domain/heartbeat observations and a pause/resume boundary were verified
+  in the actual store. Historical date selection, filtering, scrolling, and dark UI work.
+- The production store/export code passed a real-store CSV integration check.
+- Export now opens its save dialog asynchronously. Complete dialog interaction still
+  needs a manual check because the UI automation service reported repeated timeouts.
+- The bundle script now defaults to Release and supports an explicit debug override.
+- See PRODUCTION_VERIFICATION.md for evidence, limits, and remaining acceptance.
 
 ## Resume here
 
-Select a full Xcode installation, run the two scripts in README.md, then perform the
-acceptance checks above. Do not count the sample-data preview as a verified live tracker.
+Approve Accessibility for window titles, then verify minimum-width/category/settings/export
+interactions, idle/sleep/lock/wake, a live midnight boundary, and real-day usefulness.
+The toolchain/build blocker is resolved. Tracking is left enabled in the production app.

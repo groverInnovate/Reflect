@@ -227,3 +227,14 @@ Deleting legacy tables during the cleanup could risk users' activity stores; rea
 
 Moved fixtures to XCTest and added a standalone Core manifest plus a portable adapter that runs the same fixtures when Command Line Tools lacks XCTest.
 33 tests pass and the native sample-data UI was visually inspected; production SwiftData compilation is blocked by missing full Xcode, so live-device acceptance remains open.
+
+
+## 2026-10-05 — Production verification after Xcode installation
+
+Xcode 27 supports the real SwiftData build; native XCTest passes all 33 fixtures and both build configurations compile. Default bundle packaging now uses Release.
+The existing store was backed up and its old records preserved; live collection/pause/resume and production CSV accounting were checked. OS-session and Accessibility acceptance remain separate human checks.
+
+## 2026-10-05 — Nonblocking CSV save-panel presentation
+
+Changed export from a synchronous modal call to asynchronous AppKit presentation, preserving the selected date across the callback.
+This keeps the main-actor method available during destination selection; full dialog interaction remains a manual acceptance item after UI automation service timeouts.
