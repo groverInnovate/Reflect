@@ -42,6 +42,8 @@ public enum ActivityKind: String, Codable, Sendable {
     /// State-change events alone cannot tell the difference between a user who
     /// stayed in an app and an app that stopped being observed for an hour.
     case heartbeat
+    /// Explicit boundary: paused or terminated collection must never accrue app time.
+    case trackingStopped
 }
 
 public final class AppCategory {
@@ -129,21 +131,6 @@ public final class DriftEvent {
         self.switchCountInWindow = switchCountInWindow
         self.baselineSwitchRate = baselineSwitchRate
         self.severity = severity
-    }
-}
-
-public final class HealthSnapshot {
-    public var date: Date
-    public var avgHeartRate: Double?
-    public var hrv: Double?
-    public var steps: Int?
-    public var sleepHours: Double?
-    public var workoutSummary: String?
-    public var sourceFramework: String
-
-    public init(date: Date, sourceFramework: String) {
-        self.date = date
-        self.sourceFramework = sourceFramework
     }
 }
 

@@ -1,11 +1,10 @@
 import Foundation
-import Testing
+import XCTest
 @testable import LifeReplayCore
 
-@Suite("Focus engine")
-struct FocusEngineTests {
-    @Test("detects drift after sustained productive work")
-    func detectsDriftAfterProductiveSession() {
+final class FocusEngineTests: XCTestCase {
+    // detects drift after sustained productive work
+    func testDetectsDriftAfterProductiveSession() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
@@ -24,14 +23,14 @@ struct FocusEngineTests {
         let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
         let analysis = engine.analyze(events: events)
 
-        #expect(analysis.driftEvents.count == 1)
-        #expect(analysis.driftEvents[0].triggerAppNames.contains("Twitter / X"))
-        #expect(analysis.driftEvents[0].switchCountInWindow >= 4)
-        #expect(analysis.driftEvents[0].timestamp == start.addingTimeInterval(6 * 60 + 30))
+        XCTAssertTrue(analysis.driftEvents.count == 1)
+        XCTAssertTrue(analysis.driftEvents[0].triggerAppNames.contains("Twitter / X"))
+        XCTAssertTrue(analysis.driftEvents[0].switchCountInWindow >= 4)
+        XCTAssertTrue(analysis.driftEvents[0].timestamp == start.addingTimeInterval(6 * 60 + 30))
     }
 
-    @Test("does not detect drift without distracting apps")
-    func ignoresHighSwitchingWithoutDistraction() {
+    // does not detect drift without distracting apps
+    func testIgnoresHighSwitchingWithoutDistraction() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
@@ -49,11 +48,11 @@ struct FocusEngineTests {
         let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
         let analysis = engine.analyze(events: events)
 
-        #expect(analysis.driftEvents.isEmpty)
+        XCTAssertTrue(analysis.driftEvents.isEmpty)
     }
 
-    @Test("does not double count app activation and browser capture for one switch")
-    func doesNotDoubleCountSameTimestampBrowserCapture() {
+    // does not double count app activation and browser capture for one switch
+    func testDoesNotDoubleCountSameTimestampBrowserCapture() {
         let start = Date(timeIntervalSince1970: 0)
         let triggerTime = start.addingTimeInterval(6 * 60)
         let events = [
@@ -70,11 +69,11 @@ struct FocusEngineTests {
         let engine = FocusEngine(configuration: .init(defaultBaselineSwitchesPerHour: 6))
         let analysis = engine.analyze(events: events)
 
-        #expect(analysis.driftEvents.isEmpty)
+        XCTAssertTrue(analysis.driftEvents.isEmpty)
     }
 
-    @Test("scores productive days higher than distracted days")
-    func scoresProductiveDayHigher() {
+    // scores productive days higher than distracted days
+    func testScoresProductiveDayHigher() {
         let start = Date(timeIntervalSince1970: 0)
         let productive = [
             FocusSession(start: start, end: start.addingTimeInterval(3600), category: .productive),
@@ -85,11 +84,11 @@ struct FocusEngineTests {
         ]
         let engine = FocusEngine()
 
-        #expect(engine.score(sessions: productive, driftEvents: []) > engine.score(sessions: distracted, driftEvents: []))
+        XCTAssertTrue(engine.score(sessions: productive, driftEvents: []) > engine.score(sessions: distracted, driftEvents: []))
     }
 
-    @Test("idle overlap is applied to sessions")
-    func idleOverlapIsAppliedToSessions() {
+    // idle overlap is applied to sessions
+    func testIdleOverlapIsAppliedToSessions() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             event(start, app: "VS Code", bundle: "com.microsoft.VSCode"),
@@ -108,9 +107,9 @@ struct FocusEngineTests {
 
         let analysis = FocusEngine().analyze(events: events)
 
-        #expect(analysis.sessions.first?.idleSeconds == 0)
-        #expect(analysis.sessions.first?.end == start.addingTimeInterval(300))
-        #expect(analysis.sessions.first.map { $0.end!.timeIntervalSince($0.start) } == 300)
+        XCTAssertTrue(analysis.sessions.first?.idleSeconds == 0)
+        XCTAssertTrue(analysis.sessions.first?.end == start.addingTimeInterval(300))
+        XCTAssertTrue(analysis.sessions.first.map { $0.end!.timeIntervalSince($0.start) } == 300)
     }
 }
 

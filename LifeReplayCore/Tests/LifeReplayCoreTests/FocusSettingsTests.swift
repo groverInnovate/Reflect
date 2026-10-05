@@ -1,10 +1,9 @@
-import Testing
+import XCTest
 @testable import LifeReplayCore
 
-@Suite("Focus settings")
-struct FocusSettingsTests {
-    @Test("settings map to engine configuration")
-    func settingsMapToConfiguration() {
+final class FocusSettingsTests: XCTestCase {
+    // settings map to engine configuration
+    func testSettingsMapToConfiguration() {
         let settings = FocusSettings(
             idleThresholdSeconds: 120,
             sessionMinimumDurationSeconds: 45,
@@ -16,11 +15,11 @@ struct FocusSettingsTests {
 
         let configuration = settings.focusEngineConfiguration
 
-        #expect(configuration.idleThresholdSeconds == 120)
-        #expect(configuration.sessionMinimumDuration == 45)
-        #expect(configuration.driftWindow == 480)
-        #expect(configuration.defaultBaselineSwitchesPerHour == 10)
-        #expect(configuration.productiveSessionMinimumDuration == 240)
-        #expect(configuration.maximumObservedGap == 75)
+        XCTAssertTrue(configuration.idleThresholdSeconds == 120)
+        XCTAssertTrue(configuration.sessionMinimumDuration == 45)
+        XCTAssertTrue(configuration.driftWindow == 480)
+        XCTAssertTrue(configuration.defaultBaselineSwitchesPerHour == 10)
+        XCTAssertTrue(configuration.productiveSessionMinimumDuration == 240)
+        XCTAssertTrue(configuration.maximumObservedGap == 75)
     }
 }

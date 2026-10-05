@@ -1,11 +1,10 @@
 import Foundation
-import Testing
+import XCTest
 @testable import LifeReplayCore
 
-@Suite("Replay engine")
-struct ReplayEngineTests {
-    @Test("keeps adjacent blocks with different labels separate")
-    func keepsDifferentLabelsSeparate() {
+final class ReplayEngineTests: XCTestCase {
+    // keeps adjacent blocks with different labels separate
+    func testKeepsDifferentLabelsSeparate() {
         let start = Date(timeIntervalSince1970: 0)
         let sessions = [
             FocusSession(start: start, end: start.addingTimeInterval(600), category: .productive, primaryAppName: "VS Code"),
@@ -15,14 +14,14 @@ struct ReplayEngineTests {
 
         let blocks = ReplayEngine().timelineBlocks(from: sessions)
 
-        #expect(blocks.count == 3)
-        #expect(blocks[0].category == .productive)
-        #expect(blocks[0].label == "VS Code")
-        #expect(blocks[1].label == "Terminal")
+        XCTAssertTrue(blocks.count == 3)
+        XCTAssertTrue(blocks[0].category == .productive)
+        XCTAssertTrue(blocks[0].label == "VS Code")
+        XCTAssertTrue(blocks[1].label == "Terminal")
     }
 
-    @Test("fallback summary names longest productive block")
-    func fallbackSummaryUsesLongestBlock() {
+    // fallback summary names longest productive block
+    func testFallbackSummaryUsesLongestBlock() {
         let start = Date(timeIntervalSince1970: 0)
         let blocks = [
             TimelineBlock(start: start, end: start.addingTimeInterval(600), label: "Mail", category: .neutral),
@@ -31,13 +30,13 @@ struct ReplayEngineTests {
 
         let summary = ReplayEngine().fallbackSummary(blocks: blocks, driftEvents: [], focusScore: 82)
 
-        #expect(summary.contains("VS Code"))
-        #expect(summary.contains("50m"))
-        #expect(summary.contains("82"))
+        XCTAssertTrue(summary.contains("VS Code"))
+        XCTAssertTrue(summary.contains("50m"))
+        XCTAssertTrue(summary.contains("82"))
     }
 
-    @Test("timeline blocks round-trip through JSON")
-    func timelineBlocksRoundTrip() throws {
+    // timeline blocks round-trip through JSON
+    func testTimelineBlocksRoundTrip() throws {
         let start = Date(timeIntervalSince1970: 1_000)
         let blocks = [
             TimelineBlock(
@@ -53,11 +52,11 @@ struct ReplayEngineTests {
         let json = try engine.encode(blocks: blocks)
         let decoded = try engine.decodeBlocks(from: json)
 
-        #expect(decoded == blocks)
+        XCTAssertTrue(decoded == blocks)
     }
 
-    @Test("idle events appear as timeline blocks")
-    func idleEventsAppearAsTimelineBlocks() {
+    // idle events appear as timeline blocks
+    func testIdleEventsAppearAsTimelineBlocks() {
         let start = Date(timeIntervalSince1970: 0)
         let sessions = [
             FocusSession(start: start, end: start.addingTimeInterval(600), category: .productive, primaryAppName: "VS Code"),
@@ -69,11 +68,11 @@ struct ReplayEngineTests {
 
         let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(1_500))
 
-        #expect(blocks.contains { $0.label == "Idle / away" && $0.kind == .idle && $0.start == start.addingTimeInterval(900) })
+        XCTAssertTrue(blocks.contains { $0.label == "Idle / away" && $0.kind == .idle && $0.start == start.addingTimeInterval(900) })
     }
 
-    @Test("idle time is not double counted inside productive timeline blocks")
-    func idleTimeIsSubtractedFromSessionBlocks() {
+    // idle time is not double counted inside productive timeline blocks
+    func testIdleTimeIsSubtractedFromSessionBlocks() {
         let start = Date(timeIntervalSince1970: 0)
         let sessions = [
             FocusSession(start: start, end: start.addingTimeInterval(1_800), category: .productive, primaryAppName: "VS Code"),
@@ -91,38 +90,42 @@ struct ReplayEngineTests {
             .filter { $0.kind == .idle }
             .reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) }
 
-        #expect(blocks.count == 3)
-        #expect(productiveMinutes == 20)
-        #expect(idleMinutes == 10)
+        XCTAssertTrue(blocks.count == 3)
+        XCTAssertTrue(productiveMinutes == 20)
+        XCTAssertTrue(idleMinutes == 10)
     }
 
-    @Test("browser domain intervals are allocated by observed active tab")
-    func browserDomainIntervalsUseObservedActiveTab() {
+    // browser domain intervals are allocated by observed active tab
+    func testBrowserDomainIntervalsUseObservedActiveTab() {
         let start = Date(timeIntervalSince1970: 0)
         let sessions = [
             FocusSession(start: start, end: start.addingTimeInterval(89 * 60), category: .neutral, primaryAppName: "chatgpt.com"),
         ]
-        let events = [
+        var events: [ActivityEvent] = [
             ActivityEvent(timestamp: start, kind: .browserDomain, browserDomain: "chatgpt.com"),
-        ] + stride(from: 60, to: 15 * 60, by: 60).map {
+        ]
+        events += stride(from: 60, to: 15 * 60, by: 60).map {
             ActivityEvent(timestamp: start.addingTimeInterval(TimeInterval($0)), kind: .heartbeat, browserDomain: "chatgpt.com")
-        } + [
+        }
+        events += [
             ActivityEvent(timestamp: start.addingTimeInterval(15 * 60), kind: .browserDomain, browserDomain: "rust-book.cs.brown.edu"),
-        ] + stride(from: 16 * 60, to: 89 * 60, by: 60).map {
+        ]
+        events += stride(from: 16 * 60, to: 89 * 60, by: 60).map {
             ActivityEvent(timestamp: start.addingTimeInterval(TimeInterval($0)), kind: .heartbeat, browserDomain: "rust-book.cs.brown.edu")
-        } + [
+        }
+        events += [
             ActivityEvent(timestamp: start.addingTimeInterval(89 * 60), kind: .idleStart),
         ]
 
         let blocks = ReplayEngine().timelineBlocks(from: sessions, events: events, now: start.addingTimeInterval(89 * 60))
 
-        #expect(blocks.contains(TimelineBlock(
+        XCTAssertTrue(blocks.contains(TimelineBlock(
             start: start,
             end: start.addingTimeInterval(15 * 60),
             label: "ChatGPT",
             category: .productive
         )))
-        #expect(blocks.contains(TimelineBlock(
+        XCTAssertTrue(blocks.contains(TimelineBlock(
             start: start.addingTimeInterval(15 * 60),
             end: start.addingTimeInterval(89 * 60),
             label: "Rust Book",
@@ -130,8 +133,8 @@ struct ReplayEngineTests {
         )))
     }
 
-    @Test("window-title changes remain separate task contexts")
-    func windowTitleChangesRemainSeparateContexts() {
+    // window-title changes remain separate task contexts
+    func testWindowTitleChangesRemainSeparateContexts() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             ActivityEvent(timestamp: start, kind: .appActivated, appBundleID: "com.microsoft.VSCode", appName: "Visual Studio Code", windowTitle: "hive - main.rs"),
@@ -142,14 +145,14 @@ struct ReplayEngineTests {
 
         let blocks = ReplayEngine().timelineBlocks(from: [], events: events, now: start.addingTimeInterval(240))
 
-        #expect(blocks.count == 2)
-        #expect(blocks[0].detail == "hive - main.rs")
-        #expect(blocks[1].detail == "lean-sim - README.md")
-        #expect(blocks.reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) } == 4)
+        XCTAssertTrue(blocks.count == 2)
+        XCTAssertTrue(blocks[0].detail == "hive - main.rs")
+        XCTAssertTrue(blocks[1].detail == "lean-sim - README.md")
+        XCTAssertTrue(blocks.reduce(0) { $0 + Int($1.end.timeIntervalSince($1.start) / 60) } == 4)
     }
 
-    @Test("does not assign a long silent gap to the previous app")
-    func longSilentGapBecomesUnobserved() {
+    // does not assign a long silent gap to the previous app
+    func testLongSilentGapBecomesUnobserved() {
         let start = Date(timeIntervalSince1970: 0)
         let events = [
             ActivityEvent(timestamp: start, kind: .appActivated, appBundleID: "com.microsoft.VSCode", appName: "VS Code"),
@@ -161,17 +164,17 @@ struct ReplayEngineTests {
             now: start.addingTimeInterval(60 * 60)
         )
 
-        #expect(blocks.contains { $0.kind == .observed && $0.label == "VS Code" && $0.end.timeIntervalSince($0.start) == 120 })
-        #expect(blocks.contains { $0.kind == .unobserved && $0.label == "Unobserved / away" })
+        XCTAssertTrue(blocks.contains { $0.kind == .observed && $0.label == "VS Code" && $0.end.timeIntervalSince($0.start) == 120 })
+        XCTAssertTrue(blocks.contains { $0.kind == .unobserved && $0.label == "Unobserved / away" })
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
-        #expect(report.productiveMinutes == 2)
-        #expect(report.unobservedMinutes == 58)
-        #expect(report.journalSummary.contains("unobserved"))
-        #expect(report.nextAction.contains("fix collection"))
+        XCTAssertTrue(report.productiveMinutes == 2)
+        XCTAssertTrue(report.unobservedMinutes == 58)
+        XCTAssertTrue(report.journalSummary.contains("unobserved"))
+        XCTAssertTrue(report.nextAction.contains("fix collection"))
     }
 
-    @Test("insight report turns timeline blocks into journal metrics")
-    func insightReportBuildsJournalMetrics() {
+    // insight report turns timeline blocks into journal metrics
+    func testInsightReportBuildsJournalMetrics() {
         let start = Date(timeIntervalSince1970: 0)
         let blocks = [
             TimelineBlock(
@@ -214,27 +217,27 @@ struct ReplayEngineTests {
 
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: drifts, focusScore: 74)
 
-        #expect(report.productiveMinutes == 70)
-        #expect(report.studyLikeMinutes == 60)
-        #expect(report.codingLikeMinutes == 10)
-        #expect(report.deepWorkMinutes == 60)
-        #expect(report.fragmentedProductiveMinutes == 10)
-        #expect(report.distractingMinutes == 15)
-        #expect(report.idleMinutes == 15)
-        #expect(report.neutralMinutes == 0)
-        #expect(report.driftCount == 1)
-        #expect(report.longestProductiveBlockLabel == "Research reading")
-        #expect(report.topActivities.first == ActivityBreakdownItem(label: "Research reading", category: .productive, minutes: 60))
-        #expect(report.topActivities.contains(ActivityBreakdownItem(label: "Twitter", category: .distracting, minutes: 15)))
-        #expect(report.topProductiveLabels.first == "Research reading")
-        #expect(report.topDistractions.first == "Twitter")
-        #expect(!report.nextAction.isEmpty)
-        #expect(report.journalSummary.contains("productive"))
-        #expect(report.journalSummary.contains("Distracting/wasted"))
+        XCTAssertTrue(report.productiveMinutes == 70)
+        XCTAssertTrue(report.studyLikeMinutes == 60)
+        XCTAssertTrue(report.codingLikeMinutes == 10)
+        XCTAssertTrue(report.deepWorkMinutes == 60)
+        XCTAssertTrue(report.fragmentedProductiveMinutes == 10)
+        XCTAssertTrue(report.distractingMinutes == 15)
+        XCTAssertTrue(report.idleMinutes == 15)
+        XCTAssertTrue(report.neutralMinutes == 0)
+        XCTAssertTrue(report.driftCount == 1)
+        XCTAssertTrue(report.longestProductiveBlockLabel == "Research reading")
+        XCTAssertTrue(report.topActivities.first == ActivityBreakdownItem(label: "Research reading", category: .productive, minutes: 60))
+        XCTAssertTrue(report.topActivities.contains(ActivityBreakdownItem(label: "Twitter", category: .distracting, minutes: 15)))
+        XCTAssertTrue(report.topProductiveLabels.first == "Research reading")
+        XCTAssertTrue(report.topDistractions.first == "Twitter")
+        XCTAssertTrue(!report.nextAction.isEmpty)
+        XCTAssertTrue(report.journalSummary.contains("productive"))
+        XCTAssertTrue(report.journalSummary.contains("Distracting/wasted"))
     }
 
-    @Test("insight report warns about suspiciously long active blocks")
-    func insightReportWarnsAboutLongUnsplitBlocks() {
+    // insight report warns about suspiciously long active blocks
+    func testInsightReportWarnsAboutLongUnsplitBlocks() {
         let start = Date(timeIntervalSince1970: 0)
         let blocks = [
             TimelineBlock(
@@ -247,11 +250,11 @@ struct ReplayEngineTests {
 
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
 
-        #expect(report.dataQualityWarnings.contains { $0.contains("VS Code") })
+        XCTAssertTrue(report.dataQualityWarnings.contains { $0.contains("VS Code") })
     }
 
-    @Test("insight report suggests category calibration for high neutral time")
-    func insightReportSuggestsCategoryCalibration() {
+    // insight report suggests category calibration for high neutral time
+    func testInsightReportSuggestsCategoryCalibration() {
         let start = Date(timeIntervalSince1970: 0)
         let blocks = [
             TimelineBlock(
@@ -270,12 +273,12 @@ struct ReplayEngineTests {
 
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 40)
 
-        #expect(report.calibrationSuggestions.contains { $0.contains("edit categories") })
-        #expect(report.calibrationSuggestions.contains { $0.contains("Unknown Research Tool") })
+        XCTAssertTrue(report.calibrationSuggestions.contains { $0.contains("edit categories") })
+        XCTAssertTrue(report.calibrationSuggestions.contains { $0.contains("Unknown Research Tool") })
     }
 
-    @Test("AI support near notes counts as study workflow")
-    func aiSupportNearNotesCountsAsStudyWorkflow() {
+    // AI support near notes counts as study workflow
+    func testAiSupportNearNotesCountsAsStudyWorkflow() {
         let start = Date(timeIntervalSince1970: 0)
         let blocks = [
             TimelineBlock(
@@ -300,7 +303,7 @@ struct ReplayEngineTests {
 
         let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 80)
 
-        #expect(report.productiveMinutes == 45)
-        #expect(report.studyLikeMinutes == 45)
+        XCTAssertTrue(report.productiveMinutes == 45)
+        XCTAssertTrue(report.studyLikeMinutes == 45)
     }
 }

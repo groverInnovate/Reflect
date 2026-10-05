@@ -99,20 +99,26 @@ public struct CategoryResolver: Sendable {
     }
 
     private func matchedSeed(for event: ActivityEvent) -> AppCategorySeed? {
-        let text = searchableText(for: event)
-        return seeds.first { seed in
-            text.contains(seed.matchPattern.lowercased())
+        let ranked = seeds.enumerated().sorted {
+            let left = $0.element.matchPattern.count
+            let right = $1.element.matchPattern.count
+            return left == right ? $0.offset < $1.offset : left > right
+        }.map(\.element)
+        if let domain = event.browserDomain?.lowercased(), !domain.isEmpty {
+            // The collector stores hosts, never URL paths. Match domain boundaries,
+            // so x.com does not match unrelated sites ending in those letters.
+            if let match = ranked.first(where: {
+                let pattern = $0.matchPattern.lowercased()
+                return !pattern.contains("/") && (domain == pattern || domain.hasSuffix("." + pattern))
+            }) { return match }
+            // A known domain is stronger evidence than ambiguous title words.
+            return nil
         }
-    }
-
-    private func searchableText(for event: ActivityEvent) -> String {
-        [
-            event.browserDomain,
-            event.appBundleID,
-            event.appName,
-            event.windowTitle,
-        ]
-        .compactMap { $0?.lowercased() }
-        .joined(separator: " ")
+        if let bundle = event.appBundleID?.lowercased(),
+           let match = ranked.first(where: { $0.matchPattern.lowercased() == bundle }) {
+            return match
+        }
+        let text = [event.appName, event.windowTitle].compactMap { $0?.lowercased() }.joined(separator: " ")
+        return ranked.first { (!$0.matchPattern.contains(".") || $0.matchPattern.hasPrefix(".")) && text.contains($0.matchPattern.lowercased()) }
     }
 }

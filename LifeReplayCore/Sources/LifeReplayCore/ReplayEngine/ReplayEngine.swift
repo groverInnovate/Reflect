@@ -45,7 +45,7 @@ public struct ReplayEngine: Sendable {
         let fallbackBlocks = hasMeaningfulEvent
             ? []
             : sessionBlocks(from: sessions, excluding: idleIntervals(from: events, now: now))
-        return mergeBlocks((fallbackBlocks + eventBlocks).sorted { $0.start < $1.start })
+        return mergeBlocks((fallbackBlocks + (hasMeaningfulEvent ? eventBlocks : eventBlocks.filter { $0.kind == .idle })).sorted { $0.start < $1.start })
     }
 
     private func sessionBlocks(from sessions: [FocusSession]) -> [TimelineBlock] {
@@ -95,7 +95,7 @@ public struct ReplayEngine: Sendable {
                     intervals.append((idleStart, min(event.timestamp, now)))
                 }
                 idleStart = nil
-            case .appActivated, .browserDomain, .heartbeat:
+            case .appActivated, .browserDomain, .heartbeat, .trackingStopped:
                 continue
             }
         }
@@ -143,7 +143,7 @@ public struct ReplayEngine: Sendable {
                previous.category == next.category,
                previous.label == next.label,
                sameContext,
-               gap <= configuration.mergeGap,
+               gap <= 0.001,
                !overlaps {
                 previous.end = max(previous.end, next.end)
                 blocks[blocks.count - 1] = previous

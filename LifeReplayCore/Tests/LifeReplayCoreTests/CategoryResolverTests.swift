@@ -1,11 +1,10 @@
 import Foundation
-import Testing
+import XCTest
 @testable import LifeReplayCore
 
-@Suite("Category resolver")
-struct CategoryResolverTests {
-    @Test("custom seeds override default assumptions")
-    func customSeedsClassifyEvents() {
+final class CategoryResolverTests: XCTestCase {
+    // custom seeds override default assumptions
+    func testCustomSeedsClassifyEvents() {
         let resolver = CategoryResolver(seeds: [
             AppCategorySeed("example.com", "Example Research", .productive),
         ])
@@ -15,12 +14,12 @@ struct CategoryResolverTests {
             browserDomain: "example.com"
         )
 
-        #expect(resolver.category(for: event) == .productive)
-        #expect(resolver.displayName(for: event) == "Example Research")
+        XCTAssertTrue(resolver.category(for: event) == .productive)
+        XCTAssertTrue(resolver.displayName(for: event) == "Example Research")
     }
 
-    @Test("default resolver uses window titles for study material")
-    func defaultResolverUsesWindowTitles() {
+    // default resolver uses window titles for study material
+    func testDefaultResolverUsesWindowTitles() {
         let resolver = CategoryResolver()
         let event = ActivityEvent(
             timestamp: Date(timeIntervalSince1970: 0),
@@ -30,11 +29,11 @@ struct CategoryResolverTests {
             windowTitle: "Mechanical Engineering Lecture 04.pdf"
         )
 
-        #expect(resolver.category(for: event) == .productive)
+        XCTAssertTrue(resolver.category(for: event) == .productive)
     }
 
-    @Test("default resolver classifies research and course domains as productive")
-    func defaultResolverClassifiesStudyDomains() {
+    // default resolver classifies research and course domains as productive
+    func testDefaultResolverClassifiesStudyDomains() {
         let resolver = CategoryResolver()
         let events = [
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .browserDomain, browserDomain: "arxiv.org"),
@@ -43,11 +42,11 @@ struct CategoryResolverTests {
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 3), kind: .browserDomain, browserDomain: "rust-book.cs.brown.edu"),
         ]
 
-        #expect(events.allSatisfy { resolver.category(for: $0) == .productive })
+        XCTAssertTrue(events.allSatisfy { resolver.category(for: $0) == .productive })
     }
 
-    @Test("default resolver classifies AI and HackMD work as productive")
-    func defaultResolverClassifiesAIAndHackMDWork() {
+    // default resolver classifies AI and HackMD work as productive
+    func testDefaultResolverClassifiesAIAndHackMDWork() {
         let resolver = CategoryResolver()
         let events = [
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .appActivated, appName: "Claude"),
@@ -55,11 +54,11 @@ struct CategoryResolverTests {
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 2), kind: .browserDomain, browserDomain: "hackmd.io"),
         ]
 
-        #expect(events.allSatisfy { resolver.category(for: $0) == .productive })
+        XCTAssertTrue(events.allSatisfy { resolver.category(for: $0) == .productive })
     }
 
-    @Test("browser window title can provide a productive display name")
-    func browserTitleProvidesDisplayName() {
+    // browser window title can provide a productive display name
+    func testBrowserTitleProvidesDisplayName() {
         let resolver = CategoryResolver()
         let event = ActivityEvent(
             timestamp: Date(timeIntervalSince1970: 0),
@@ -68,18 +67,18 @@ struct CategoryResolverTests {
             windowTitle: "Week 2 - HackMD - Brave"
         )
 
-        #expect(resolver.category(for: event) == .productive)
-        #expect(resolver.displayName(for: event) == "HackMD")
+        XCTAssertTrue(resolver.category(for: event) == .productive)
+        XCTAssertTrue(resolver.displayName(for: event) == "HackMD")
     }
 
-    @Test("known domains use their category display names")
-    func knownDomainsUseDisplayNames() {
+    // known domains use their category display names
+    func testKnownDomainsUseDisplayNames() {
         let resolver = CategoryResolver()
         let events = [
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 0), kind: .browserDomain, browserDomain: "hackmd.io"),
             ActivityEvent(timestamp: Date(timeIntervalSince1970: 1), kind: .browserDomain, browserDomain: "chatgpt.com"),
         ]
 
-        #expect(events.map { resolver.displayName(for: $0) } == ["HackMD", "ChatGPT"])
+        XCTAssertTrue(events.map { resolver.displayName(for: $0) } == ["HackMD", "ChatGPT"])
     }
 }
