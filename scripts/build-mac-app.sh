@@ -8,10 +8,11 @@ if ! xcodebuild -version >/dev/null 2>&1; then
   exit 1
 fi
 cd "$ROOT_DIR"
+LIFEREPLAY_BUILD_CONFIGURATION="${LIFEREPLAY_BUILD_CONFIGURATION:-release}"
 # --show-bin-path only prints a path. Build first so an old executable can never
 # be bundled after source changes or a failed compilation.
-swift build --disable-sandbox --product LifeReplayMac
-BIN_DIR="$(swift build --disable-sandbox --show-bin-path)"
+swift build --disable-sandbox -c "$LIFEREPLAY_BUILD_CONFIGURATION" --product LifeReplayMac
+BIN_DIR="$(swift build --disable-sandbox -c "$LIFEREPLAY_BUILD_CONFIGURATION" --show-bin-path)"
 APP_DIR="$ROOT_DIR/.build/LifeReplayMac.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"

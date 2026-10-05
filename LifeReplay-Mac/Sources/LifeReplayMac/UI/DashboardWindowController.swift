@@ -52,9 +52,17 @@ final class WorkdayViewModel {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = "Life Replay \(date.formatted(.iso8601.year().month().day())).csv"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try store.exportCSV(for: date, to: url) }
-        catch { self.error = "Export failed: \(error.localizedDescription)" }
+        let selectedDate = date
+        // Keep collection and dashboard updates running while the user chooses a
+        // destination; a save dialog must not stall the app's main event loop.
+        panel.begin { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                guard let self else { return }
+                do { try self.store.exportCSV(for: selectedDate, to: url) }
+                catch { self.error = "Export failed: \(error.localizedDescription)" }
+            }
+        }
     }
 }
 
