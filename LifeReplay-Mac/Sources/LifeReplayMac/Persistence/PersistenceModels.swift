@@ -10,7 +10,6 @@ typealias CoreActivityEvent = LifeReplayCore.ActivityEvent
 typealias CoreAppCategory = LifeReplayCore.AppCategory
 typealias CoreFocusSession = LifeReplayCore.FocusSession
 typealias CoreDriftEvent = LifeReplayCore.DriftEvent
-typealias CoreHealthSnapshot = LifeReplayCore.HealthSnapshot
 typealias CoreDailyReplay = LifeReplayCore.DailyReplay
 typealias CoreFocusSettings = LifeReplayCore.FocusSettings
 
@@ -151,14 +150,10 @@ final class HealthSnapshot {
     var workoutSummary: String?
     var sourceFramework: String
 
-    init(core snapshot: CoreHealthSnapshot) {
-        date = snapshot.date
-        avgHeartRate = snapshot.avgHeartRate
-        hrv = snapshot.hrv
-        steps = snapshot.steps
-        sleepHours = snapshot.sleepHours
-        workoutSummary = snapshot.workoutSummary
-        sourceFramework = snapshot.sourceFramework
+    // Legacy schema only. Retained so upgrading does not discard an existing store.
+    init(date: Date, sourceFramework: String) {
+        self.date = date
+        self.sourceFramework = sourceFramework
     }
 }
 

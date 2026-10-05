@@ -1,832 +1,435 @@
 import AppKit
 import Foundation
 import LifeReplayCore
+import Observation
+import SwiftUI
+import UniformTypeIdentifiers
+
+@MainActor
+@Observable
+final class WorkdayViewModel {
+    var date = Date()
+    var report = WorkdayReport(blocks: [])
+    var drifts: [CoreDriftEvent] = []
+    var isTracking = false
+    var error: String?
+    var browserIssue: String?
+    var accessibilityAllowed = false
+    let store: LifeReplayStore
+    let permissions: PermissionController
+    let trackingState: () -> Bool
+    let readBrowserIssue: () -> String?
+    let toggleTracking: () -> Void
+    let loginStatus: () -> String
+    let toggleLogin: () -> Void
+    let settingsChanged: () -> Void
+
+    init(store: LifeReplayStore, permissions: PermissionController,
+         trackingState: @escaping () -> Bool, browserIssue: @escaping () -> String?,
+         toggleTracking: @escaping () -> Void, loginStatus: @escaping () -> String,
+         toggleLogin: @escaping () -> Void, settingsChanged: @escaping () -> Void) {
+        self.store = store; self.permissions = permissions
+        self.trackingState = trackingState; self.readBrowserIssue = browserIssue
+        self.toggleTracking = toggleTracking; self.loginStatus = loginStatus
+        self.toggleLogin = toggleLogin; self.settingsChanged = settingsChanged
+    }
+
+    func reload() {
+        let data = store.report(for: date)
+        report = data.report; drifts = data.drifts
+        isTracking = trackingState()
+        browserIssue = readBrowserIssue()
+        accessibilityAllowed = permissions.isAccessibilityTrusted
+        error = store.lastError
+    }
+
+    func moveDay(_ offset: Int) {
+        date = Calendar.current.date(byAdding: .day, value: offset, to: date) ?? date
+        reload()
+    }
+
+    func export() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "Life Replay \(date.formatted(.iso8601.year().month().day())).csv"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do { try store.exportCSV(for: date, to: url) }
+        catch { self.error = "Export failed: \(error.localizedDescription)" }
+    }
+}
 
 @MainActor
 final class DashboardWindowController: NSWindowController {
-    private let store: LifeReplayStore
-    private let permissions: PermissionController
-    private let notifications: DriftNotificationController
-    private var notificationSummary: DriftNotificationController.AuthorizationSummary = .unknown
-    private let summaryTextView = NSTextView()
-    private let insightsTextView = NSTextView()
-    private let timelineTextView = NSTextView()
-    private let driftTextView = NSTextView()
-    private let rawTextView = NSTextView()
-    private let refreshButton = NSButton(title: "Refresh Today's Review", target: nil, action: nil)
-    private let repairButton = NSButton(title: "Repair Sleep Gaps", target: nil, action: nil)
-    private let reviewStatusLabel = NSTextField(labelWithString: "")
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .medium
-        return formatter
-    }()
+    private let model: WorkdayViewModel
 
-    init(store: LifeReplayStore, permissions: PermissionController, notifications: DriftNotificationController) {
-        self.store = store
-        self.permissions = permissions
-        self.notifications = notifications
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 860, height: 620),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.title = "Life Replay Dashboard"
-        window.backgroundColor = DashboardStyle.windowBackground
+    init(store: LifeReplayStore, permissions: PermissionController,
+         trackingState: @escaping () -> Bool, browserIssue: @escaping () -> String?,
+         toggleTracking: @escaping () -> Void, loginStatus: @escaping () -> String,
+         toggleLogin: @escaping () -> Void, settingsChanged: @escaping () -> Void) {
+        model = WorkdayViewModel(store: store, permissions: permissions, trackingState: trackingState,
+            browserIssue: browserIssue, toggleTracking: toggleTracking, loginStatus: loginStatus,
+            toggleLogin: toggleLogin, settingsChanged: settingsChanged)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1020, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered, defer: false)
+        window.title = "Life Replay"
+        window.titlebarAppearsTransparent = true
+        window.minSize = NSSize(width: 780, height: 620)
+        window.isReleasedWhenClosed = false
         window.center()
-
+        window.contentView = NSHostingView(rootView: WorkdayDashboard(model: model))
         super.init(window: window)
-        configureContent()
         reload()
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("DashboardWindowController is created in code.")
-    }
+    required init?(coder: NSCoder) { fatalError("Created in code") }
+    func reload() { model.reload() }
+}
 
-    func reload() {
-        notifications.authorizationSummary { [weak self] summary in
-            self?.notificationSummary = summary
-            self?.renderCurrentData()
-        }
-        renderCurrentData()
-    }
-
-    private func renderCurrentData() {
-        let data = dashboardData()
-        applyStyledReport(renderDailyReview(data), to: summaryTextView)
-        applyStyledReport(renderTimeline(data.blocks), to: timelineTextView)
-        applyStyledReport(renderFocusBreaks(data.analysis.driftEvents, insights: data.insights), to: driftTextView)
-    }
-
-    private func configureContent() {
-        guard let contentView = window?.contentView else { return }
-
-        let stackView = NSStackView()
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.orientation = .vertical
-        stackView.spacing = 12
-
-        let headerView = NSStackView()
-        headerView.orientation = .horizontal
-        headerView.alignment = .centerY
-        headerView.spacing = 12
-
-        refreshButton.target = self
-        refreshButton.action = #selector(refreshTodayReview)
-        refreshButton.bezelStyle = .rounded
-        refreshButton.controlSize = .large
-
-        repairButton.target = self
-        repairButton.action = #selector(repairSleepGaps)
-        repairButton.bezelStyle = .rounded
-        repairButton.controlSize = .large
-
-        reviewStatusLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        reviewStatusLabel.textColor = DashboardStyle.secondaryText
-        reviewStatusLabel.lineBreakMode = .byTruncatingTail
-
-        headerView.addArrangedSubview(refreshButton)
-        headerView.addArrangedSubview(repairButton)
-        headerView.addArrangedSubview(reviewStatusLabel)
-        headerView.setHuggingPriority(.defaultLow, for: .horizontal)
-        reviewStatusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
-
-        let tabView = NSTabView()
-        tabView.translatesAutoresizingMaskIntoConstraints = false
-        tabView.addTabViewItem(tab(title: "Daily Review", textView: summaryTextView))
-        tabView.addTabViewItem(tab(title: "Activity Timeline", textView: timelineTextView))
-        tabView.addTabViewItem(tab(title: "Focus Breaks", textView: driftTextView))
-
-        stackView.addArrangedSubview(headerView)
-        stackView.addArrangedSubview(tabView)
-        contentView.addSubview(stackView)
-        NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
-            tabView.heightAnchor.constraint(greaterThanOrEqualToConstant: 480),
-        ])
-    }
-
-    @objc private func refreshTodayReview() {
-        refreshButton.isEnabled = false
-        repairButton.isEnabled = false
-        reviewStatusLabel.stringValue = "Generating today's review..."
-        Task { @MainActor in
-            let replay = await store.generateDailyReplayWithNarrative()
-            reviewStatusLabel.stringValue = replay.map {
-                "Updated \($0.generatedAt.formatted(date: .omitted, time: .shortened))"
-            } ?? "Could not generate review"
-            refreshButton.isEnabled = true
-            repairButton.isEnabled = true
-            reload()
-        }
-    }
-
-    @objc private func repairSleepGaps() {
-        refreshButton.isEnabled = false
-        repairButton.isEnabled = false
-        reviewStatusLabel.stringValue = "Repairing suspicious gaps..."
-
-        let result = store.repairTodaySleepGaps()
-        if result.repairedIntervals == 0 {
-            reviewStatusLabel.stringValue = "No repairable gaps found"
-        } else {
-            reviewStatusLabel.stringValue = "Repaired \(result.repairedIntervals) gap\(result.repairedIntervals == 1 ? "" : "s")"
-        }
-        refreshButton.isEnabled = true
-        repairButton.isEnabled = true
-        reload()
-    }
-
-    private func tab(title: String, textView: NSTextView) -> NSTabViewItem {
-        let item = NSTabViewItem()
-        item.label = title
-
-        let scrollView = NSScrollView()
-        scrollView.hasVerticalScroller = true
-        scrollView.borderType = .noBorder
-        scrollView.drawsBackground = true
-        scrollView.backgroundColor = DashboardStyle.reportBackground
-
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.isRichText = true
-        textView.font = DashboardStyle.bodyFont
-        textView.textContainerInset = NSSize(width: 28, height: 26)
-        textView.backgroundColor = DashboardStyle.reportBackground
-        textView.textColor = DashboardStyle.primaryText
-        scrollView.documentView = textView
-
-        item.view = scrollView
-        return item
-    }
-
-    private func dashboardData() -> DashboardData {
-        let events = store.eventsForToday()
-        let analysis = store.analyzeToday()
-        let resolver = CategoryResolver(seeds: store.categorySeeds())
-        let blocks = store.makeReplayEngine().timelineBlocks(
-            from: analysis.sessions,
-            events: events,
-            resolver: resolver,
-            now: Date()
-        )
-        let savedReplay = store.existingDailyReplay()
-        let insights = store.makeReplayEngine().insightReport(
-            blocks: blocks,
-            driftEvents: analysis.driftEvents,
-            focusScore: analysis.focusScore
-        )
-        let health = trackingHealth(events: events, insights: insights)
-        let categoryCandidates = categoryFixCandidates(events: events, resolver: resolver)
-        return DashboardData(
-            events: events,
-            analysis: analysis,
-            blocks: blocks,
-            savedReplay: savedReplay,
-            insights: insights,
-            trackingHealth: health,
-            categoryCandidates: categoryCandidates
-        )
-    }
-
-    private func renderDailyReview(_ data: DashboardData) -> String {
-        let insights = data.insights
-        var lines: [String] = [
-            "Life Replay",
-            "Daily Review - \(Date.now.formatted(date: .long, time: .omitted))",
-            "",
-            "Today's Numbers",
-            "---------------",
-            "Focus Score: \(insights.focusScore)/100 - \(focusQuality(insights.focusScore))",
-            "Active observed: \(formatMinutes(insights.observedActiveMinutes))    Idle/away: \(formatMinutes(insights.idleMinutes))    Not assigned: \(formatMinutes(insights.unobservedMinutes))",
-            "Productive: \(formatMinutes(insights.productiveMinutes))    Study/research: \(formatMinutes(insights.studyLikeMinutes))    Coding/tooling: \(formatMinutes(insights.codingLikeMinutes))",
-            "Wasted/distraction: \(formatMinutes(insights.distractingMinutes))    Neutral/unclassified: \(formatMinutes(insights.neutralMinutes))",
-            "Deep work: \(formatMinutes(insights.deepWorkMinutes))    Fragmented productive: \(formatMinutes(insights.fragmentedProductiveMinutes))",
-            "Focus breaks: \(insights.driftCount)",
-            "Only observed active time is scored. Gaps without fresh evidence are left unassigned instead of charged to the last app.",
-            "",
-            "Where Time Went",
-            "---------------",
-        ]
-
-        if insights.topActivities.isEmpty {
-            lines.append("No meaningful activity blocks yet. Keep collection running during a real session.")
-        } else {
-            lines += insights.topActivities.map(renderActivityLine)
-        }
-
-        if !insights.dataQualityWarnings.isEmpty {
-            lines += [
-                "",
-                "Accuracy Notes",
-                "--------------",
-            ]
-            lines += insights.dataQualityWarnings.map { "Check: \($0)" }
-            lines.append("Use Repair Sleep Gaps if this warning came from Mac sleep or lid-close time.")
-        }
-
-        if !insights.calibrationSuggestions.isEmpty {
-            lines += [
-                "",
-                "Calibration Suggestions",
-                "-----------------------",
-            ]
-            lines += insights.calibrationSuggestions.map { "Tune: \($0)" }
-        }
-
-        lines += [
-            "",
-            "Tracking Health",
-            "---------------",
-            "Health: \(data.trackingHealth.confidence) - \(data.trackingHealth.summary)",
-            "Events today: \(data.trackingHealth.totalEvents)    Heartbeats: \(data.trackingHealth.heartbeatEvents)    Browser tab captures: \(data.trackingHealth.browserDomainEvents)    Window titles: \(data.trackingHealth.windowTitleEvents)",
-            "Last signal: \(data.trackingHealth.lastSignalText)",
-        ]
-        lines += data.trackingHealth.actions.map { "Action: \($0)" }
-
-        if !data.categoryCandidates.isEmpty {
-            lines += [
-                "",
-                "Category Fix Candidates",
-                "-----------------------",
-            ]
-            lines += data.categoryCandidates.map(renderCategoryCandidate)
-        }
-
-        lines += [
-            "",
-            "Focus Story",
-            "-----------",
-            "Best block: \(insights.longestProductiveBlockLabel ?? "none detected")\(insights.longestProductiveBlockMinutes.map { " for \(formatMinutes($0))" } ?? "")",
-            "Main productive threads: \(insights.topProductiveLabels.isEmpty ? "none detected" : insights.topProductiveLabels.joined(separator: ", "))",
-            "Main distractions: \(insights.topDistractions.isEmpty ? "none detected" : insights.topDistractions.joined(separator: ", "))",
-            "",
-            "Journal",
-            "-------",
-            data.savedReplay?.narrativeSummary ?? insights.journalSummary,
-            "",
-            "What To Do Next",
-            "---------------",
-            insights.nextAction,
-            "",
-            "Protection Status",
-            "-----------------",
-            "Accessibility: \(permissions.isAccessibilityTrusted ? "Allowed" : "Needs approval for window titles")",
-            "Notifications: \(notificationSummary.rawValue)",
-            "Drift alerts: \(notificationAdvice())",
-        ]
-        return lines.joined(separator: "\n")
-    }
-
-    private func renderInsights(_ insights: DailyInsightReport) -> String {
-        var lines: [String] = [
-            "Time Breakdown",
-            "--------------",
-            "Productive:   \(formatMinutes(insights.productiveMinutes))",
-            "Study-like:   \(formatMinutes(insights.studyLikeMinutes))",
-            "Coding-like:  \(formatMinutes(insights.codingLikeMinutes))",
-            "Deep work:    \(formatMinutes(insights.deepWorkMinutes))",
-            "Fragmented productive: \(formatMinutes(insights.fragmentedProductiveMinutes))",
-            "Distracting/Wasted: \(formatMinutes(insights.distractingMinutes))",
-            "Neutral:      \(formatMinutes(insights.neutralMinutes))",
-            "Idle/Away:    \(formatMinutes(insights.idleMinutes))",
-            "Tracked:      \(formatMinutes(insights.totalTrackedMinutes))",
-            "",
-            "Focus",
-            "-----",
-            "Score: \(insights.focusScore)/100",
-            "Drift events: \(insights.driftCount)",
-            "Best block: \(insights.longestProductiveBlockLabel ?? "none")\(insights.longestProductiveBlockMinutes.map { " (\(formatMinutes($0)))" } ?? "")",
-            "Top productive threads: \(insights.topProductiveLabels.isEmpty ? "none detected" : insights.topProductiveLabels.joined(separator: ", "))",
-            "Top distractions: \(insights.topDistractions.isEmpty ? "none detected" : insights.topDistractions.joined(separator: ", "))",
-            "",
-            "Journal",
-            "-------",
-            insights.journalSummary,
-            "",
-            "Observations",
-            "------------",
-        ]
-        lines += insights.observations.map { "- \($0)" }
-        lines += [
-            "",
-            "Next Action",
-            "-----------",
-            insights.nextAction,
-        ]
-        return lines.joined(separator: "\n")
-    }
-
-    private func renderTimeline(_ blocks: [TimelineBlock]) -> String {
-        if blocks.isEmpty {
-            return "No timeline blocks yet. Keep collection running and switch apps a bit."
-        }
-        var lines = [
-            "Activity Timeline",
-            "Today - \(Date.now.formatted(date: .long, time: .omitted))",
-            "-----------------",
-            "This is the compact replay of what the Mac observed today. Rapid sub-minute switches are grouped for readability.",
-            "",
-        ]
-        lines += compactTimelineForDisplay(blocks).map(renderBlock)
-        return lines.joined(separator: "\n")
-    }
-
-    private func renderFocusBreaks(_ drifts: [LifeReplayCore.DriftEvent], insights: DailyInsightReport) -> String {
-        var lines = [
-            "Focus Breaks",
-            "Today - \(Date.now.formatted(date: .long, time: .omitted))",
-            "------------",
-            "Notifications: \(notificationSummary.rawValue)",
-            notificationAdvice(),
-            "",
-        ]
-
-        if drifts.isEmpty {
-            lines += [
-                "No focus breaks detected today.",
-                "",
-                "If this was a real work/study session, that means the app did not see a sustained productive block followed by distracting switching.",
-                "If you were distracted but nothing appeared here, use Edit Categories to mark the distracting app or domain correctly.",
-            ]
-            return lines.joined(separator: "\n")
-        }
-
-        lines += [
-            "Detected \(drifts.count) focus break\(drifts.count == 1 ? "" : "s") today.",
-            "Worst visible trigger: \(insights.worstDriftTrigger?.isEmpty == false ? insights.worstDriftTrigger! : "unknown")",
-            "",
-        ]
-        lines += drifts.map(renderDrift)
-        return lines.joined(separator: "\n")
-    }
-
-    private func renderRawEvents(_ events: [LifeReplayCore.ActivityEvent]) -> String {
-        if events.isEmpty {
-            return "No raw events captured today."
-        }
-        return events.suffix(250).map(renderEvent).joined(separator: "\n")
-    }
-
-    private func renderBlock(_ block: TimelineBlock) -> String {
-        let start = dateFormatter.string(from: block.start)
-        let end = dateFormatter.string(from: block.end)
-        let minutes = Int(block.end.timeIntervalSince(block.start) / 60)
-        let detail = block.detail.map { " - \($0)" } ?? ""
-        return "\(start)-\(end)  \(formatMinutes(minutes))  \(categoryLabel(block.category, kind: block.kind))  \(block.label)\(detail)"
-    }
-
-    private func compactTimelineForDisplay(_ blocks: [TimelineBlock]) -> [TimelineBlock] {
-        var compacted: [TimelineBlock] = []
-        var microRun: [TimelineBlock] = []
-
-        func flushMicroRun() {
-            guard !microRun.isEmpty else { return }
-            if microRun.count == 1 {
-                compacted.append(microRun[0])
-            } else {
-                let labels = Array(Set(microRun.map(\.label))).sorted()
-                compacted.append(TimelineBlock(
-                    start: microRun[0].start,
-                    end: microRun[microRun.count - 1].end,
-                    label: "Mixed \(categoryLabel(microRun[0].category).lowercased()) activity",
-                    category: microRun[0].category,
-                    detail: labels.joined(separator: ", "),
-                    kind: .observed
-                ))
-            }
-            microRun.removeAll()
-        }
-
-        for block in blocks {
-            let duration = block.end.timeIntervalSince(block.start)
-            if duration < 60, block.kind == .observed {
-                if let last = microRun.last, last.category != block.category {
-                    flushMicroRun()
-                }
-                microRun.append(block)
-            } else {
-                flushMicroRun()
-                compacted.append(block)
-            }
-        }
-        flushMicroRun()
-        return compacted
-    }
-
-    private func renderDrift(_ drift: LifeReplayCore.DriftEvent) -> String {
-        let time = dateFormatter.string(from: drift.timestamp)
-        let triggers = drift.triggerAppNames.isEmpty ? "unknown trigger" : drift.triggerAppNames.joined(separator: ", ")
-        let severity = Int(drift.severity * 100)
-        return "\(time)  \(drift.switchCountInWindow) switches  \(severity)% severity  Trigger: \(triggers)"
-    }
-
-    private func renderEvent(_ event: LifeReplayCore.ActivityEvent) -> String {
-        let time = dateFormatter.string(from: event.timestamp)
-        let name = event.browserDomain ?? event.appName ?? event.appBundleID ?? "-"
-        let title = event.windowTitle.map { "  -  \($0)" } ?? ""
-        return "\(time)  \(event.kind.rawValue)  \(name)\(title)"
-    }
-
-    private func formatMinutes(_ minutes: Int) -> String {
-        if minutes < 60 {
-            return "\(minutes)m"
-        }
-        let hours = minutes / 60
-        let remainder = minutes % 60
-        return remainder == 0 ? "\(hours)h" : "\(hours)h \(remainder)m"
-    }
-
-    private func renderActivityLine(_ item: ActivityBreakdownItem) -> String {
-        "\(formatMinutes(item.minutes))  \(categoryLabel(item.category, kind: item.kind))  \(item.label)"
-    }
-
-    private func categoryLabel(_ category: FocusCategory, kind: TimelineBlockKind = .observed) -> String {
-        switch kind {
-        case .idle:
-            return "Idle / away"
-        case .unobserved:
-            return "Not assigned"
-        case .observed:
-            break
-        }
+private enum ReportStyle {
+    static func color(_ category: FocusCategory) -> Color {
         switch category {
-        case .productive:
-            return "Productive"
-        case .neutral:
-            return "Neutral"
-        case .distracting:
-            return "Distracting"
+        case .productive: .blue
+        case .neutral: Color(nsColor: .secondaryLabelColor)
+        case .distracting: .orange
+        }
+    }
+    static func duration(_ seconds: TimeInterval) -> String {
+        let minutes = Int(max(0, seconds) / 60)
+        if seconds <= 0 { return "0m" }
+        if minutes == 0 { return "<1m" }
+        return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+    }
+    static func categoryName(_ category: FocusCategory) -> String {
+        switch category {
+        case .productive: "Work"
+        case .neutral: "Other"
+        case .distracting: "Distractions"
+        }
+    }
+}
+
+private struct WorkdayDashboard: View {
+    @Bindable var model: WorkdayViewModel
+    @State private var showCategories = false
+    @State private var showSettings = false
+    @State private var selectedActivity: String?
+    @State private var showAway = true
+    @State private var search = ""
+    private var isToday: Bool { Calendar.current.isDateInToday(model.date) }
+    private var visibleBlocks: [TimelineBlock] {
+        model.report.blocks.filter {
+            (showAway || $0.kind == .observed)
+                && (selectedActivity == nil || ($0.kind == .observed && $0.label == selectedActivity))
+                && (search.isEmpty || $0.label.localizedCaseInsensitiveContains(search)
+                    || ($0.detail?.localizedCaseInsensitiveContains(search) ?? false))
         }
     }
 
-    private func focusQuality(_ score: Int) -> String {
-        switch score {
-        case 80...100:
-            "strong day"
-        case 60..<80:
-            "useful, with room to tighten focus"
-        case 40..<60:
-            "mixed day; distractions or fragmentation were visible"
-        default:
-            "needs protection before distracting apps/sites open"
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                header
+                if let error = model.error { notice(error, symbol: "exclamationmark.triangle", color: .red) }
+                if let issue = model.browserIssue {
+                    HStack {
+                        notice(issue, symbol: "globe", color: .orange)
+                        Button("Open Settings") { model.permissions.openAutomationSettings() }
+                    }
+                }
+                if !model.isTracking && isToday {
+                    notice("Tracking is paused. Resume to record your next work session.", symbol: "pause.circle", color: .secondary)
+                }
+                if model.report.blocks.isEmpty {
+                    emptyState
+                } else {
+                    metrics
+                    hourlyChart
+                    activityList
+                    timeline
+                }
+                footer
+            }
+            .padding(32)
+            .frame(maxWidth: 1120, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .toolbar {
+            ToolbarItemGroup {
+                Button { model.toggleTracking(); model.reload() } label: {
+                    Label(model.isTracking ? "Pause" : "Resume", systemImage: model.isTracking ? "pause" : "play")
+                }.help(model.isTracking ? "Pause tracking" : "Resume tracking")
+                Button { model.reload() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
+                Menu {
+                    Button("Edit Categories…") { showCategories = true }
+                    Button("Tracking Settings…") { showSettings = true }
+                    Divider()
+                    Button("Export This Day as CSV…") { model.export() }.disabled(model.report.blocks.isEmpty)
+                } label: { Label("Options", systemImage: "ellipsis.circle") }
+            }
+        }
+        .sheet(isPresented: $showCategories, onDismiss: { model.reload() }) {
+            CategoryRulesView(store: model.store)
+        }
+        .sheet(isPresented: $showSettings, onDismiss: { model.settingsChanged(); model.reload() }) {
+            TrackingSettingsView(model: model)
+        }
+        .onChange(of: model.date) { _, _ in selectedActivity = nil; model.reload() }
+    }
+
+    private var header: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("YOUR WORKDAY").font(.system(size: 11, weight: .semibold)).tracking(2).foregroundStyle(.secondary)
+                Text(isToday ? "Today" : model.date.formatted(.dateTime.weekday(.wide)))
+                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                Text(model.date.formatted(.dateTime.month(.wide).day().year())).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 12) {
+                HStack(spacing: 6) {
+                    Circle().fill(model.isTracking ? Color.green : Color.secondary).frame(width: 6, height: 6)
+                    Text(model.isTracking ? "Tracking" : "Paused").font(.caption).foregroundStyle(.secondary)
+                }.accessibilityElement(children: .combine)
+                HStack {
+                    Button { model.moveDay(-1) } label: { Image(systemName: "chevron.left") }
+                        .help("Previous day").accessibilityLabel("Previous day")
+                    DatePicker("Date", selection: $model.date, in: ...Date(), displayedComponents: .date).labelsHidden()
+                        .accessibilityLabel("Report date")
+                    Button { model.moveDay(1) } label: { Image(systemName: "chevron.right") }
+                        .disabled(isToday).help("Next day").accessibilityLabel("Next day")
+                    if !isToday { Button("Today") { model.date = Date() } }
+                }.controlSize(.small)
+            }
         }
     }
 
-    private func notificationAdvice() -> String {
-        switch notificationSummary {
-        case .authorized, .provisional, .ephemeral:
-            "Life Replay can warn you when a productive session starts drifting toward distracting apps or domains."
-        case .denied:
-            "Notifications are denied, so Life Replay can detect drift but cannot interrupt it. Enable notifications from the menu to get prevention alerts."
-        case .unavailable:
-            "Notifications are only available from the signed .app bundle, not when running the raw executable."
-        case .notDetermined:
-            "Notifications have not been approved yet. Use the menu notification action so drift alerts can interrupt distractions."
-        case .unknown:
-            "Notification status is still being checked."
-        }
+    private var metrics: some View {
+        HStack(spacing: 0) {
+            metric("Active time", seconds: model.report.activeSeconds, color: .primary)
+            Divider().frame(height: 48)
+            metric("Work", seconds: model.report.productiveSeconds, color: .blue)
+            Divider().frame(height: 48)
+            metric("Other", seconds: model.report.neutralSeconds, color: .secondary)
+            Divider().frame(height: 48)
+            metric("Distractions", seconds: model.report.distractingSeconds, color: .orange)
+        }.padding(.vertical, 22).background(.background, in: RoundedRectangle(cornerRadius: 16))
     }
 
-    private func trackingHealth(events: [LifeReplayCore.ActivityEvent], insights: DailyInsightReport) -> TrackingHealthReport {
-        let activeObservedMinutes = insights.observedActiveMinutes
-        let activeEvents = events.filter { $0.kind == .appActivated || $0.kind == .browserDomain }
-        let browserDomainEvents = events.filter { $0.kind == .browserDomain }.count
-        let heartbeatEvents = events.filter { $0.kind == .heartbeat }.count
-        let windowTitleEvents = events.filter { $0.windowTitle?.isEmpty == false }.count
-        let browserAppEvents = events.filter(isBrowserAppEvent).count
-        let idleStarts = events.filter { $0.kind == .idleStart }.count
-        let idleEnds = events.filter { $0.kind == .idleEnd }.count
-        let neutralShare = activeObservedMinutes == 0
-            ? 0
-            : Double(insights.neutralMinutes) / Double(max(1, activeObservedMinutes))
-        let lastEvent = events.last?.timestamp
-
-        var actions: [String] = []
-        var confidence = "Good"
-        var summary = "Tracking is healthy enough to judge the day."
-
-        if events.isEmpty {
-            confidence = "No data"
-            summary = "Life Replay has not captured activity today."
-            actions.append("Leave the menu bar app running during a real work or study session.")
-        }
-
-        if !permissions.isAccessibilityTrusted {
-            confidence = maxRisk(confidence, "Needs setup")
-            summary = "Window titles are missing, so notes, PDFs, and browser context may be under-labeled."
-            actions.append("Approve Accessibility for LifeReplayMac, then quit and reopen the app.")
-        }
-
-        if browserAppEvents > 0, browserDomainEvents == 0 {
-            confidence = maxRisk(confidence, "Needs setup")
-            summary = "A browser was visible, but active tab domains were not captured."
-            actions.append("Use Capture Current Browser Tab from the menu and approve the Automation prompt.")
-        }
-
-        if activeObservedMinutes >= 60, activeEvents.count < 8 {
-            confidence = maxRisk(confidence, "Low")
-            summary = "The day has a long active block with very few switching signals."
-            actions.append("Keep the app running continuously; if the Mac slept, run Repair Sleep Gaps.")
-        }
-
-        if insights.unobservedMinutes >= 10 {
-            confidence = maxRisk(confidence, "Medium")
-            summary = "Some time was left unassigned because fresh activity evidence was missing."
-            actions.append("Keep Life Replay running; unobserved gaps are excluded rather than guessed.")
-        }
-
-        if neutralShare >= 0.35 {
-            confidence = maxRisk(confidence, "Medium")
-            summary = "A large share of visible time is neutral or unclassified."
-            actions.append("Open Edit Categories and classify the top neutral apps/domains from Where Time Went.")
-        }
-
-        if idleStarts != idleEnds {
-            confidence = maxRisk(confidence, "Medium")
-            summary = "An idle interval is still open or partially repaired."
-            actions.append("Refresh after you return, or use Repair Sleep Gaps if this came from lid-close time.")
-        }
-
-        switch notificationSummary {
-        case .denied:
-            confidence = maxRisk(confidence, "Medium")
-            actions.append("Enable notifications so drift protection can interrupt distractions in real time.")
-        case .unavailable:
-            actions.append("Use the signed .app bundle for notification and permission testing.")
-        default:
-            break
-        }
-
-        if !insights.dataQualityWarnings.isEmpty {
-            confidence = maxRisk(confidence, "Medium")
-        }
-
-        if actions.isEmpty {
-            actions.append("No immediate calibration needed. Review the timeline against your memory tonight.")
-        }
-
-        return TrackingHealthReport(
-            confidence: confidence,
-            summary: summary,
-            totalEvents: events.count,
-            heartbeatEvents: heartbeatEvents,
-            browserDomainEvents: browserDomainEvents,
-            windowTitleEvents: windowTitleEvents,
-            lastSignalText: lastEvent.map(relativeSignalText) ?? "none today",
-            actions: Array(actions.prefix(4))
-        )
+    private func metric(_ title: String, seconds: TimeInterval, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(ReportStyle.duration(seconds)).font(.system(size: 28, weight: .medium, design: .rounded))
+                .monospacedDigit().foregroundStyle(color)
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 22)
     }
 
-    private func isBrowserAppEvent(_ event: LifeReplayCore.ActivityEvent) -> Bool {
-        let candidates = [
-            event.appName,
-            event.appBundleID,
-            event.windowTitle,
-        ].compactMap { $0?.lowercased() }
-        let browserTerms = ["safari", "chrome", "brave", "edge", "vivaldi", "firefox", "arc"]
-        return candidates.contains { value in
-            browserTerms.contains { value.contains($0) }
-        }
-    }
-
-    private func relativeSignalText(_ date: Date) -> String {
-        let seconds = max(0, Int(Date().timeIntervalSince(date)))
-        if seconds < 60 {
-            return "just now"
-        }
-        if seconds < 60 * 60 {
-            return "\(seconds / 60)m ago"
-        }
-        return "\(seconds / 3600)h \((seconds % 3600) / 60)m ago"
-    }
-
-    private func maxRisk(_ current: String, _ candidate: String) -> String {
-        let order = ["Good": 0, "Medium": 1, "Low": 2, "Needs setup": 3, "No data": 4]
-        return (order[candidate, default: 0] > order[current, default: 0]) ? candidate : current
-    }
-
-    private func categoryFixCandidates(events: [LifeReplayCore.ActivityEvent], resolver: CategoryResolver) -> [CategoryFixCandidate] {
-        let meaningfulEvents = events
-            .filter { $0.kind == .appActivated || $0.kind == .browserDomain }
-            .sorted { $0.timestamp < $1.timestamp }
-        guard meaningfulEvents.count >= 2 else { return [] }
-
-        var totals: [String: CategoryFixCandidate] = [:]
-
-        for (index, event) in meaningfulEvents.enumerated() {
-            guard resolver.category(for: event) == .neutral else { continue }
-            let rawNextTimestamp = index + 1 < meaningfulEvents.count ? meaningfulEvents[index + 1].timestamp : Date()
-            let maximumObservationGap = store.focusSettings().maximumObservationGapSeconds
-            let nextTimestamp = min(
-                rawNextTimestamp,
-                event.timestamp.addingTimeInterval(maximumObservationGap)
-            )
-            let minutes = max(0, Int(nextTimestamp.timeIntervalSince(event.timestamp) / 60))
-            guard minutes > 0, let pattern = candidatePattern(for: event) else { continue }
-
-            let key = pattern.lowercased()
-            let label = resolver.displayName(for: event)
-            if var existing = totals[key] {
-                existing.minutes += minutes
-                totals[key] = existing
+    private var hourlyChart: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Text("Activity by hour").font(.headline)
+                Spacer()
+                ForEach([FocusCategory.productive, .neutral, .distracting], id: \.self) { category in
+                    HStack(spacing: 5) {
+                        Circle().fill(ReportStyle.color(category)).frame(width: 6, height: 6)
+                        Text(ReportStyle.categoryName(category)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if model.report.hours.isEmpty {
+                Text("No active time recorded.").foregroundStyle(.secondary)
             } else {
-                totals[key] = CategoryFixCandidate(pattern: pattern, label: label, minutes: minutes)
+                HStack(alignment: .bottom, spacing: 6) {
+                    ForEach(model.report.hours) { hour in
+                        VStack(spacing: 8) {
+                            VStack(spacing: 0) {
+                                Spacer(minLength: 0)
+                                Rectangle().fill(Color.orange.opacity(0.8)).frame(height: hour.distracting / 3600 * 80)
+                                Rectangle().fill(Color.secondary.opacity(0.3)).frame(height: hour.neutral / 3600 * 80)
+                                Rectangle().fill(Color.blue.opacity(0.8)).frame(height: hour.productive / 3600 * 80)
+                            }.frame(height: 80).background(Color.primary.opacity(0.025))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                            Text(String(format: "%02d", Calendar.current.component(.hour, from: hour.start)))
+                                .font(.system(size: 10)).foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity)
+                            .help("\(hour.start.formatted(date: .omitted, time: .shortened)): \(ReportStyle.duration(hour.active)) active")
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(hour.start.formatted(date: .omitted, time: .shortened)), work \(ReportStyle.duration(hour.productive)), other \(ReportStyle.duration(hour.neutral)), distractions \(ReportStyle.duration(hour.distracting))")
+                    }
+                }
             }
         }
+    }
 
-        return totals.values
-            .sorted { lhs, rhs in
-                if lhs.minutes == rhs.minutes { return lhs.label < rhs.label }
-                return lhs.minutes > rhs.minutes
+    private var activityList: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Where your time went").font(.headline)
+                Spacer()
+                Button("Edit categories") { showCategories = true }.buttonStyle(.link)
             }
-            .prefix(4)
-            .map { $0 }
+            VStack(spacing: 0) {
+                ForEach(model.report.activities) { activity in
+                    Button {
+                        selectedActivity = selectedActivity == activity.label ? nil : activity.label
+                    } label: {
+                        HStack(spacing: 16) {
+                            RoundedRectangle(cornerRadius: 4).fill(ReportStyle.color(activity.category).opacity(0.12))
+                                .overlay(Image(systemName: "app").font(.system(size: 15)).foregroundStyle(ReportStyle.color(activity.category)))
+                                .frame(width: 32, height: 32)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(activity.label).font(.system(size: 13, weight: .medium)).foregroundStyle(.primary)
+                                Text(ReportStyle.categoryName(activity.category)).font(.caption).foregroundStyle(.secondary)
+                            }.frame(width: 200, alignment: .leading)
+                            GeometryReader { proxy in
+                                Capsule().fill(Color.primary.opacity(0.04))
+                                    .overlay(alignment: .leading) {
+                                        Capsule().fill(ReportStyle.color(activity.category).opacity(0.7))
+                                            .frame(width: proxy.size.width * activity.seconds / max(1, model.report.activeSeconds))
+                                    }
+                            }.frame(height: 5)
+                            Text("\(Int((activity.seconds / max(1, model.report.activeSeconds) * 100).rounded()))%")
+                                .font(.caption).foregroundStyle(.secondary).monospacedDigit().frame(width: 40, alignment: .trailing)
+                            Text(ReportStyle.duration(activity.seconds)).font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.primary).monospacedDigit().frame(width: 72, alignment: .trailing)
+                        }.padding(.horizontal, 16).padding(.vertical, 12)
+                            .background(selectedActivity == activity.label ? Color.blue.opacity(0.06) : Color.clear)
+                    }.buttonStyle(.plain).help("Show \(activity.label) in the timeline")
+                    if activity.id != model.report.activities.last?.id { Divider().padding(.leading, 64) }
+                }
+            }.background(.background, in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 
-    private func candidatePattern(for event: LifeReplayCore.ActivityEvent) -> String? {
-        if let domain = event.browserDomain, !domain.isEmpty {
-            return domain
-        }
-        if let bundleID = event.appBundleID, !bundleID.isEmpty {
-            return bundleID
-        }
-        if let appName = event.appName, !appName.isEmpty {
-            return appName
-        }
-        if let title = event.windowTitle, !title.isEmpty {
-            return title
-        }
-        return nil
-    }
-
-    private func renderCategoryCandidate(_ candidate: CategoryFixCandidate) -> String {
-        "Review: \(formatMinutes(candidate.minutes)) as \(candidate.label) - add rule pattern `\(candidate.pattern)` if this should be productive or distracting."
-    }
-
-    private func applyStyledReport(_ report: String, to textView: NSTextView) {
-        let styled = NSMutableAttributedString()
-        let lines = report.components(separatedBy: "\n")
-
-        for (index, line) in lines.enumerated() {
-            let attributes = attributes(for: line, at: index, previousLine: index > 0 ? lines[index - 1] : nil)
-            styled.append(NSAttributedString(string: line, attributes: attributes))
-            if index < lines.count - 1 {
-                styled.append(NSAttributedString(string: "\n", attributes: DashboardStyle.bodyAttributes))
+    private var timeline: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Timeline").font(.headline)
+                Spacer()
+                Toggle("Include breaks", isOn: $showAway).toggleStyle(.checkbox).font(.caption)
+                TextField("Find an app or site", text: $search).textFieldStyle(.roundedBorder).frame(width: 180)
+            }
+            if let selectedActivity {
+                HStack {
+                    Text("Showing \(selectedActivity)").font(.caption).foregroundStyle(.secondary)
+                    Button("Show all") { self.selectedActivity = nil }.buttonStyle(.link)
+                }
+            }
+            if visibleBlocks.isEmpty { Text("No matching activity.").foregroundStyle(.secondary).padding(.vertical, 16) }
+            LazyVStack(spacing: 0) {
+                ForEach(Array(visibleBlocks.enumerated()), id: \.offset) { _, block in
+                    HStack(alignment: .top, spacing: 16) {
+                        Text(block.start.formatted(date: .omitted, time: .shortened))
+                            .font(.system(size: 12)).monospacedDigit().foregroundStyle(.secondary).frame(width: 76, alignment: .trailing)
+                        Capsule().fill(block.kind == .observed ? ReportStyle.color(block.category) : Color.secondary.opacity(0.25))
+                            .frame(width: 3, height: 28)
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(block.kind == .unobserved ? "Not tracked" : block.label)
+                                .font(.system(size: 13, weight: .medium))
+                            Text("Until \(block.end.formatted(date: .omitted, time: .shortened))")
+                                .font(.caption).foregroundStyle(.secondary)
+                            if let detail = block.detail, block.kind == .observed {
+                                Text(detail).font(.caption).foregroundStyle(.tertiary).lineLimit(1).help(detail)
+                            }
+                        }
+                        Spacer()
+                        Text(ReportStyle.duration(block.end.timeIntervalSince(block.start)))
+                            .font(.system(size: 12, weight: .medium)).monospacedDigit().foregroundStyle(.secondary)
+                    }.padding(.vertical, 12)
+                    Divider().padding(.leading, 95)
+                }
+            }
+            if !model.drifts.isEmpty {
+                DisclosureGroup("Focus breaks · \(model.drifts.count)") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(model.drifts.enumerated()), id: \.offset) { _, drift in
+                            Text("\(drift.timestamp.formatted(date: .omitted, time: .shortened)) · \(drift.switchCountInWindow) switches in \(Int(model.store.focusSettings().driftWindowMinutes)) minutes · \(drift.triggerAppNames.joined(separator: ", "))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }.padding(.top, 12).frame(maxWidth: .infinity, alignment: .leading)
+                }.font(.subheadline)
             }
         }
-
-        textView.textStorage?.setAttributedString(styled)
     }
 
-    private func attributes(for line: String, at index: Int, previousLine: String?) -> [NSAttributedString.Key: Any] {
-        var attributes = DashboardStyle.bodyAttributes
-
-        if index == 0 {
-            attributes[.font] = DashboardStyle.titleFont
-            attributes[.foregroundColor] = DashboardStyle.titleText
-            attributes[.paragraphStyle] = DashboardStyle.titleParagraphStyle
-            return attributes
-        }
-
-        if index == 1, previousLine == "Life Replay" {
-            attributes[.font] = DashboardStyle.subtitleFont
-            attributes[.foregroundColor] = DashboardStyle.secondaryText
-            attributes[.paragraphStyle] = DashboardStyle.subtitleParagraphStyle
-            return attributes
-        }
-
-        if line.allSatisfy({ $0 == "-" }), !line.isEmpty {
-            attributes[.foregroundColor] = DashboardStyle.separator
-            return attributes
-        }
-
-        if isSectionHeader(line: line) {
-            attributes[.font] = DashboardStyle.sectionFont
-            attributes[.foregroundColor] = DashboardStyle.titleText
-            attributes[.paragraphStyle] = DashboardStyle.sectionParagraphStyle
-            return attributes
-        }
-
-        if line.contains("Productive") || line.contains("strong day") {
-            attributes[.foregroundColor] = DashboardStyle.productiveText
-        } else if line.contains("Distracting") || line.contains("Wasted") || line.contains("Denied") || line.contains("focus break") || line.hasPrefix("Check:") || line.contains("Needs setup") || line.contains("Low") {
-            attributes[.foregroundColor] = DashboardStyle.distractingText
-        } else if line.hasPrefix("Tune:") || line.hasPrefix("Action:") || line.hasPrefix("Review:") || line.contains("Health:") {
-            attributes[.foregroundColor] = DashboardStyle.accentText
-        } else if line.contains("Idle") || line.contains("Neutral") {
-            attributes[.foregroundColor] = DashboardStyle.neutralText
-        } else if line.contains("Focus Score") || line.contains("Tracked time") || line.contains("Notifications") {
-            attributes[.font] = DashboardStyle.emphasisFont
-            attributes[.foregroundColor] = DashboardStyle.accentText
-        }
-
-        return attributes
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "chart.bar.xaxis").font(.system(size: 36, weight: .light)).foregroundStyle(.secondary)
+            Text(isToday ? "Your workday starts here" : "No activity recorded on this day").font(.title2.weight(.medium))
+            Text(isToday ? "Use your Mac as usual. Your apps and websites will appear here as time is recorded."
+                        : "Choose another date to review a recorded workday.")
+                .foregroundStyle(.secondary).multilineTextAlignment(.center).frame(maxWidth: 420)
+            if !model.isTracking && isToday { Button("Resume tracking") { model.toggleTracking(); model.reload() } }
+        }.frame(maxWidth: .infinity).padding(.vertical, 80)
     }
 
-    private func isSectionHeader(line: String) -> Bool {
-        [
-            "Where Time Went",
-            "Accuracy Notes",
-            "Today's Numbers",
-            "Calibration Suggestions",
-            "Tracking Health",
-            "Category Fix Candidates",
-            "Focus Story",
-            "Journal",
-            "What To Do Next",
-            "Protection Status",
-            "Activity Timeline",
-            "Focus Breaks",
-        ].contains(line)
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !model.report.blocks.isEmpty {
+                HStack(spacing: 18) {
+                    Text("Idle / away  \(ReportStyle.duration(model.report.idleSeconds))")
+                    if model.report.unobservedSeconds > 0 {
+                        Text("Not tracked  \(ReportStyle.duration(model.report.unobservedSeconds))")
+                    }
+                }.font(.caption).foregroundStyle(.secondary)
+            }
+            Text("Active time measures the frontmost app or browser tab, excluding idle and untracked time. All data stays on this Mac.")
+                .font(.caption).foregroundStyle(.secondary)
+            if !model.accessibilityAllowed {
+                HStack {
+                    Text("Allow Accessibility to add window and project titles.").font(.caption).foregroundStyle(.secondary)
+                    Button("Allow…") { model.permissions.requestAccessibilityPermission(); model.permissions.openAccessibilitySettings() }
+                        .buttonStyle(.link).font(.caption)
+                }
+            }
+        }
+    }
+
+    private func notice(_ text: String, symbol: String, color: Color) -> some View {
+        Label(text, systemImage: symbol).font(.callout).foregroundStyle(color)
+            .padding(12).frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
-private struct DashboardData {
-    var events: [LifeReplayCore.ActivityEvent]
-    var analysis: FocusAnalysis
-    var blocks: [TimelineBlock]
-    var savedReplay: LifeReplayCore.DailyReplay?
-    var insights: DailyInsightReport
-    var trackingHealth: TrackingHealthReport
-    var categoryCandidates: [CategoryFixCandidate]
-}
-
-private struct TrackingHealthReport {
-    var confidence: String
-    var summary: String
-    var totalEvents: Int
-    var heartbeatEvents: Int
-    var browserDomainEvents: Int
-    var windowTitleEvents: Int
-    var lastSignalText: String
-    var actions: [String]
-}
-
-private struct CategoryFixCandidate {
-    var pattern: String
-    var label: String
-    var minutes: Int
-}
-
-@MainActor
-private enum DashboardStyle {
-    static let windowBackground = NSColor(calibratedRed: 0.94, green: 0.95, blue: 0.96, alpha: 1)
-    static let reportBackground = NSColor(calibratedRed: 0.985, green: 0.985, blue: 0.975, alpha: 1)
-    static let titleText = NSColor(calibratedRed: 0.08, green: 0.10, blue: 0.12, alpha: 1)
-    static let primaryText = NSColor(calibratedRed: 0.13, green: 0.15, blue: 0.17, alpha: 1)
-    static let secondaryText = NSColor(calibratedRed: 0.38, green: 0.42, blue: 0.46, alpha: 1)
-    static let accentText = NSColor(calibratedRed: 0.08, green: 0.28, blue: 0.52, alpha: 1)
-    static let productiveText = NSColor(calibratedRed: 0.05, green: 0.38, blue: 0.26, alpha: 1)
-    static let distractingText = NSColor(calibratedRed: 0.62, green: 0.13, blue: 0.13, alpha: 1)
-    static let neutralText = NSColor(calibratedRed: 0.43, green: 0.34, blue: 0.12, alpha: 1)
-    static let separator = NSColor(calibratedRed: 0.75, green: 0.78, blue: 0.80, alpha: 1)
-
-    static let titleFont = NSFont.systemFont(ofSize: 30, weight: .bold)
-    static let subtitleFont = NSFont.systemFont(ofSize: 15, weight: .medium)
-    static let sectionFont = NSFont.systemFont(ofSize: 17, weight: .semibold)
-    static let bodyFont = NSFont.systemFont(ofSize: 14, weight: .regular)
-    static let emphasisFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
-
-    static var bodyAttributes: [NSAttributedString.Key: Any] {
-        [
-            .font: bodyFont,
-            .foregroundColor: primaryText,
-            .paragraphStyle: bodyParagraphStyle,
-        ]
-    }
-
-    static var bodyParagraphStyle: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.lineSpacing = 3
-        style.paragraphSpacing = 4
-        return style
-    }
-
-    static var titleParagraphStyle: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.paragraphSpacing = 4
-        return style
-    }
-
-    static var subtitleParagraphStyle: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.paragraphSpacing = 18
-        return style
-    }
-
-    static var sectionParagraphStyle: NSParagraphStyle {
-        let style = NSMutableParagraphStyle()
-        style.paragraphSpacingBefore = 12
-        style.paragraphSpacing = 2
-        return style
+private struct TrackingSettingsView: View {
+    var model: WorkdayViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var threshold: Double = 90
+    @State private var loginState = ""
+    @State private var error: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Tracking settings").font(.title2.weight(.semibold))
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("Consider the Mac idle after", selection: $threshold) {
+                    ForEach([30.0, 60, 90, 120, 300, 600, 900], id: \.self) { seconds in
+                        Text(seconds == 90 ? "1 minute 30 seconds" : seconds == 30 ? "30 seconds" : "\(Int(seconds / 60)) minutes").tag(seconds)
+                    }
+                }
+                Text("Short pauses count as active until this limit. Longer periods with no keyboard or mouse input are marked idle; reading and calls may be idle too.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Launch at login")
+                    Text(loginState).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Change") { model.toggleLogin(); loginState = model.loginStatus() }
+            }
+            if let error { Text(error).foregroundStyle(.red).font(.caption) }
+            HStack {
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") {
+                    do { try model.store.updateIdleThreshold(threshold); dismiss() }
+                    catch { self.error = error.localizedDescription }
+                }.keyboardShortcut(.defaultAction)
+            }
+        }.padding(28).frame(width: 460)
+            .onAppear { threshold = model.store.focusSettings().idleThresholdSeconds; loginState = model.loginStatus() }
     }
 }

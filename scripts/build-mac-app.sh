@@ -3,7 +3,15 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export CLANG_MODULE_CACHE_PATH="$ROOT_DIR/.build/ModuleCache"
-BIN_DIR="$(cd "$ROOT_DIR" && swift build --disable-sandbox --product LifeReplayMac --show-bin-path)"
+if ! xcodebuild -version >/dev/null 2>&1; then
+  echo "Full Xcode is required for the SwiftData compiler plugin. Install Xcode, select it in Xcode Settings > Locations > Command Line Tools, then rerun this script." >&2
+  exit 1
+fi
+cd "$ROOT_DIR"
+# --show-bin-path only prints a path. Build first so an old executable can never
+# be bundled after source changes or a failed compilation.
+swift build --disable-sandbox --product LifeReplayMac
+BIN_DIR="$(swift build --disable-sandbox --show-bin-path)"
 APP_DIR="$ROOT_DIR/.build/LifeReplayMac.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -31,7 +39,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>0.2.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>LSMinimumSystemVersion</key>

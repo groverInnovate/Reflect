@@ -6,7 +6,6 @@ let package = Package(
     name: "LifeReplay",
     platforms: [
         .macOS(.v14),
-        .iOS(.v17),
     ],
     products: [
         .library(name: "LifeReplayCore", targets: ["LifeReplayCore"]),

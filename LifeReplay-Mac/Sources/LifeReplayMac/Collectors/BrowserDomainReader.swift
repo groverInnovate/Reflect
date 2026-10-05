@@ -6,6 +6,9 @@ import OSLog
 final class BrowserDomainReader {
     private let logger = Logger(subsystem: "LifeReplayMac", category: "BrowserDomainReader")
 
+    private(set) var lastFailure: String?
+    private var retryAfter: [String: Date] = [:]
+
     func domainForFrontmostBrowser(bundleIdentifier: String?) -> String? {
         guard let bundleIdentifier else { return nil }
 
@@ -31,7 +34,13 @@ final class BrowserDomainReader {
         }
 
         guard let script else { return nil }
-        guard let urlString = runAppleScript(script), !urlString.isEmpty else { return nil }
+        if let retry = retryAfter[bundleIdentifier], retry > Date() { return nil }
+        guard let urlString = runAppleScript(script) else {
+            retryAfter[bundleIdentifier] = Date().addingTimeInterval(30)
+            return nil
+        }
+        lastFailure = nil
+        guard !urlString.isEmpty else { return nil }
         return normalizedDomain(from: urlString)
     }
 
@@ -46,9 +55,10 @@ final class BrowserDomainReader {
 
     private func runAppleScript(_ source: String) -> String? {
         var error: NSDictionary?
-        guard let script = NSAppleScript(source: source) else { return nil }
+        guard let script = NSAppleScript(source: "with timeout of 1 seconds\n" + source + "\nend timeout") else { return nil }
         let output = script.executeAndReturnError(&error)
         if let error {
+            lastFailure = "Website capture unavailable. Allow this browser in System Settings → Privacy & Security → Automation. App time is still tracked."
             logger.debug("AppleScript browser read failed: \(String(describing: error), privacy: .public)")
             return nil
         }
