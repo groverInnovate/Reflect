@@ -1,176 +1,62 @@
 # Progress
 
-## Phase Checklist
+## Current scope — 5 October 2026
 
-- [ ] Phase 0 - Project setup + capability probe
-  - [x] Repo documentation created: `AGENTS.md`, `DECISIONS.md`, `PROGRESS.md`
-  - [x] Swift package scaffolded with `LifeReplayCore` and `LifeReplayMac` targets
-  - [x] Script-built macOS `.app` bundle path added
-  - [ ] Xcode workspace/project configured for free Personal Team signing
-  - [ ] Empty macOS menu bar app builds and launches on-device
-  - [ ] HealthKit probe run on physical iPhone and result documented
-- [ ] Phase 1 - Mac activity collector
-  - [x] Frontmost app activation events captured in the menu bar process
-  - [x] Idle start/end events captured in the menu bar process
-  - [x] Accessibility permission prompt/settings link implemented
-  - [x] Browser-domain capture implemented for Safari and Chrome-family browsers
-  - [x] Accessibility window-title capture implemented
-  - [x] Menu bar controls show running state and event count
-  - [x] Collector events persisted to SwiftData
-  - [x] Basic raw event inspection window implemented
-  - [x] User-editable app/domain categories implemented
-  - [ ] Real coding-session verification completed by Mohit
-- [ ] Phase 2 - Focus Drift Engine
-  - [x] Initial rule-based drift engine implemented in `LifeReplayCore`
-  - [x] Synthetic core coverage added with Swift Testing fixtures
-  - [x] Live Mac event stream wired into persistence
-  - [x] Drift notifications implemented for bundled app runs
-  - [x] User-tunable drift thresholds implemented
-  - [ ] Drift notifications verified from bundled app/Xcode run
-- [ ] Phase 3 - Daily Replay generation + Mac dashboard UI
-  - [x] Initial timeline clustering implemented in `LifeReplayCore`
-  - [x] Daily replay snapshots persisted to SwiftData
-  - [x] Dashboard timeline UI implemented
-  - [x] Journal-style daily insights implemented
-  - [ ] End-of-day real usage check completed
-- [ ] Phase 4 - On-device narrative summary
-  - [x] Deterministic fallback summary implemented
-  - [x] Foundation Models path implemented behind availability checks
-- [ ] Phase 5 - Optional iPhone companion
-  - [ ] Not started
-- [ ] Phase 6 - Further stretch
-  - [ ] Not started
+Mac-only workday time analysis. The older companion/health and narrative phases are
+cancelled, as are coaching, reminder, intervention, sleep-repair, and score interfaces.
+Historical implementation notes remain available in git history and DECISIONS.md.
 
-## Latest Session Notes
+## Phase checklist
 
-- Created the persistent repo instructions file from the pasted spec.
-- Added the first testable core implementation for categories, drift detection, scoring, timeline clustering, and fallback summaries.
-- Added an initial macOS menu bar collector for frontmost app switches and idle transitions.
-- `swift test` passes with 5 Swift Testing tests.
-- Added SwiftData persistence and a basic native dashboard/raw event window.
-- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
-- Added Accessibility permission menu actions and AppleScript browser-domain capture.
-- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
-- Added optional window title capture through Accessibility and showed titles in the raw event dashboard.
-- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test after the schema change.
-- Added a permissions/status section to the dashboard.
-- `swift test` passes with 5 Swift Testing tests.
-- Added live focus analysis after each captured event, persisted generated sessions/drifts, and displayed drift details in the dashboard.
-- Added local drift notifications for bundled app runs; notifications are intentionally skipped under raw `swift run` because macOS requires a real app bundle.
-- `swift test` passes with 5 Swift Testing tests; `swift run LifeReplayMac` launches in a smoke test.
-- Added `scripts/build-mac-app.sh`; `.build/LifeReplayMac.app` launches successfully through `open`.
-- Added editable category rules and switched live/dashboard analysis to use SwiftData categories.
-- `swift test` passes with 6 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added manual daily replay generation and persistence for timeline JSON, score, and fallback narrative.
-- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added Markdown export for generated daily replays.
-- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Replaced the single-pane dashboard with Summary, Timeline, Drift Events, and Raw Events tabs.
-- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Fixed permission/status reporting: menu refreshes when opened, notification status is visible, and browser-domain reads retry while a browser stays frontmost.
-- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- If Accessibility still says "Needs Approval" after the toggle is on, quit and reopen `.build/LifeReplayMac.app`; macOS TCC can require a process restart after approval.
-- Stabilized the generated app signature identifier as `com.mohitgrover.LifeReplayMac`; Mohit may need to remove the old Accessibility row and approve the new signed identity once.
-- When Notifications are denied, the menu now opens macOS Notification Settings instead of attempting a re-prompt that macOS will not show.
-- Added optional Foundation Models daily replay narratives with deterministic fallback on unsupported devices/OS versions.
-- `swift test` passes with 7 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added `FocusSettings` persistence and a Focus Drift Settings window for threshold tuning.
-- `swift test` passes with 8 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added idle periods to generated timeline blocks.
-- `swift test` passes with 9 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a menu action to send a test notification for immediate alert verification.
-- Added Snooze 15m and Dismiss notification actions for drift alerts.
-- Focus scoring now subtracts idle overlap from sessions.
-- `swift test` passes with 10 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a manual browser-tab capture action for immediate Automation/domain verification.
-- Added local CSV export for today's raw events and drift events.
-- Added a read-only Data Status window with today/all-time persistence counts.
-- Added a read-only Replay History window for saved daily replays.
-- Added optional Launch at Login menu toggle.
-- Pause/resume collection now persists across app relaunches.
-- Added JSON export for category rules and focus settings.
-- Added a local weekly rollup window over saved daily replays.
-- Added recent replay backfill for days with events but no saved DailyReplay.
-- Added `DailyInsightReport` with productive, study-like, distracting/wasted, idle, focus, top-distraction, and observation fields.
-- Added a Dashboard Insights tab and richer Markdown export summaries so the app reads more like an end-of-day productivity journal.
-- `swift test` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Rolled back the unstable native Today dashboard and later crash-fix stack to the last known stable text dashboard checkpoint.
-- Hardened `scripts/build-mac-app.sh` to use a repo-local module cache, disable SwiftPM's nested sandbox, recreate the `.app`, add `PkgInfo`, clear xattrs, and sign consistently.
-- `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Improved the existing stable Insights tab with coding-like time, deep-work time, fragmented productive time, top productive threads, and a next action.
-- Kept dashboard structure unchanged to avoid reintroducing the native Today dashboard crash path.
-- `CLANG_MODULE_CACHE_PATH=.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Reworked the stable dashboard into three user-facing tabs: Daily Review, Activity Timeline, and Focus Breaks.
-- Added ranked activity breakdowns so the dashboard answers where time went, including productive, study/research, coding/tooling, distracting/wasted, and idle time.
-- Added clearer drift-prevention copy that explains whether notifications can interrupt future focus breaks.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added macOS sleep/wake observers so closing the Mac lid records an idle interval instead of stretching the previous app session through sleep.
-- Polished the stable dashboard with larger typography, warmer report background, and color-coded productive/distracting/idle/status lines.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 11 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a real-time `FocusProtectionEngine` that detects when a distracting app/domain follows a sustained productive block.
-- Wired focus protection into live collection with a 10-minute notification cooldown so it can interrupt distractions without spamming.
-- Added synthetic tests for focus-protection alerts and short-block suppression.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 13 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Expanded category matching to include window titles, improving study/research detection for lecture PDFs and similar materials.
-- Added productive defaults for docs/course/research surfaces such as Google Docs, developer docs, docs.rs, arXiv, Overleaf, Coursera, edX, and PDF/lecture/course titles.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a dashboard-level "Refresh Today's Review" button that regenerates the daily replay and shows the last updated time.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 15 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added fallback sleep detection from long collector timer gaps, covering cases where macOS sleep/wake notifications are missed.
-- Replay timeline generation now removes idle intervals from active app blocks, so sleep/idle is not double-counted as productive time in the dashboard.
-- Added a regression test for idle overlap in replay blocks.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 16 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added dashboard data-quality warnings for suspiciously long uninterrupted active blocks and long tracked days with no idle.
-- Added a regression test for suspicious long-block warnings.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 17 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added `ActivityRepairEngine` to infer idle intervals across long unmarked gaps.
-- Added dashboard and menu actions to repair today's sleep gaps, refresh analysis, and regenerate today's replay.
-- Added synthetic tests for repair insertion and duplicate-prevention.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a repeating 9:30 PM local notification reminder to review the daily replay.
-- Added a menu action to reschedule the daily review reminder.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added a clearer "Today's Numbers" section and repair guidance beneath dashboard accuracy warnings.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added app-side automatic daily replay generation after 9:30 PM when the app is running.
-- Added a generated-review notification that includes the focus score.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 19 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added dashboard calibration suggestions for high neutral/unclassified time, repair needs, missing study detection, and missing distraction detection.
-- Added a regression test for high-neutral category calibration suggestions.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 20 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Changed replay generation to build timeline blocks from observed event intervals, so different browser domains with the same category no longer collapse into one long mislabeled block.
-- Added Rust Book productive/study defaults for `rust-book.cs.brown.edu` and `doc.rust-lang.org/book`.
-- Reduced live browser/idle polling from 15 seconds to 5 seconds to catch tab switches sooner.
-- Added regression coverage for ChatGPT-to-Rust-Book browser intervals.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 21 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added productive defaults for Claude, ChatGPT, and HackMD.
-- Existing databases now backfill missing default category rules on launch while preserving user edits.
-- Browser app events can use window-title category matches for display names, so `Week 2 - HackMD - Brave` can show as HackMD when domain capture misses.
-- Activity Timeline now compacts rapid sub-minute switches into mixed activity rows for readability.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 23 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Claude/ChatGPT blocks adjacent to study/notes tools now count toward study/research as support work.
-- Known category matches now use display names like HackMD, ChatGPT, and Rust Book instead of splitting totals by raw domains.
-- Dashboard now shows active observed time separately from idle/away so repaired sleep does not dominate the main headline.
-- Added regression coverage for AI support inside a HackMD study workflow.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Researched the current Apple free-tier capability boundary and captured the winding-down backlog in `COMPLETION_PLAN.md`.
-- Added a Daily Review Tracking Health section that explains event density, browser tab capture, window-title capture, idle/sleep markers, neutral-category risk, notification readiness, and the next calibration action.
-- Updated `README.md` with the final run path, accuracy judgment loop, calibration workflow, split-screen/frontmost limitation, and debug export guidance.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
-- Added Category Fix Candidates to the Daily Review so top neutral app/domain patterns can be quickly classified through Edit Categories.
-- `CLANG_MODULE_CACHE_PATH=/Users/mohitgrover/Documents/Life_Replay/.build/ModuleCache swift test --disable-sandbox` passes with 25 Swift Testing tests; `scripts/build-mac-app.sh` succeeds.
+- [ ] Phase 0 — Mac project and local persistence setup
+  - [x] Mac/Core package layout, local SwiftData implementation, stable bundle script
+  - [x] Mac-only target and updated agent/product documentation
+  - [x] Legacy SwiftData entity names preserved, CloudKit explicitly disabled
+  - [ ] Production build and store initialization verified with full Xcode
+- [ ] Phase 1 — Accurate collection
+  - [x] App activation, five-second idle/domain polling, 15-second heartbeats
+  - [x] Explicit pause/quit boundaries, fresh context on idle recovery
+  - [x] Sleep/display/session observers; require fresh input after sleep
+  - [x] Browser-return domain capture; bounded AppleScript timeout and error retry
+  - [x] Accessibility/Automation and storage failures shown in the UI
+  - [ ] Real-session app/domain/idle/sleep/lock verification
+- [x] Phase 2 — Seconds-based accounting
+  - [x] Seconds retained through aggregation; no eight-activity truncation
+  - [x] Deterministic same-instant event ordering; future events excluded
+  - [x] App attribution expires after 30 seconds in Mac reporting
+  - [x] Unknown gaps remain unknown; no gap-filling timeline merges
+  - [x] Hourly buckets, midnight carry/clipping, secondary focus-break evidence
+  - [x] 33 core regression tests pass through the portable XCTest-fixture runner
+- [ ] Phase 3 — Native dashboard
+  - [x] Time totals, hourly chart, ranked apps/sites, timeline
+  - [x] Date navigation, category editor, search/filter, exact-seconds CSV
+  - [x] Simple menu bar, tracking toggle, idle setting, launch-at-login
+  - [x] Swift 6 type checking against a temporary store interface
+  - [x] Actual SwiftUI sample-data window launched and visually inspected
+  - [x] App filtering observed working in the preview
+  - [ ] Production dashboard interaction, full-day scrolling, dark/minimum-width checks
+- [ ] Phase 4 — Production acceptance
+  - [ ] Full production SwiftData build and launch
+  - [ ] Existing-store migration verified
+  - [ ] Browser/Accessibility permissions verified on the running production app
+  - [ ] Timed session, pause/resume, sleep/wake, midnight and historical-report checks
+  - [ ] Mohit's real-day accuracy/usefulness judgment
 
-## 2026-08-15 Product and accounting rescue
+## Verification details
 
-- Audited the product around the evening-mentor promise and documented the findings in `PRODUCT_AUDIT.md`.
-- Removed the P0 daily fetch cap that silently discarded most events after roughly 2,000 rows.
-- Added active `.heartbeat` events, a configurable maximum observation gap, and explicit `observed`, `idle`, and `unobserved` timeline blocks. Missing evidence is no longer charged to the last app or included in the focus score.
-- Reworked focus analysis to use the evidence-bounded timeline, split sessions around idle/unobserved intervals, exclude heartbeats from switch counts, and use a seven-day same-hour median baseline when available.
-- Normalized same-timestamp app activation plus browser-domain signals so one action cannot count as two switches.
-- Moved SwiftData records to the Mac persistence boundary while preserving existing entity names, so the core engines are independently testable and old stores remain compatible.
-- Raised inferred sleep/away repair to genuinely long gaps (two hours) and labeled the result as inferred rather than certain.
-- Added regression fixtures for heartbeats, idle separation, long silent gaps, browser interval continuity, duplicate switch signals, and the new observation-gap setting.
-- Updated the dashboard and README to explain observed, idle/away, and not-assigned time, plus the honest frontmost/split-screen limitation.
-- Preserved same-app task context changes in replay blocks when Accessibility window titles differ, so project/file work does not collapse into one opaque app block.
-- Changed the mentor next action to prioritize fixing collection/permissions whenever 30+ minutes are unobserved, instead of giving behavior advice from incomplete evidence.
-- Verification is currently limited by this environment: `swift build --target LifeReplayCore` passes with the repo-local module cache and both source trees pass Swift syntax parsing, but `swift test` stops because this Command Line Tools image lacks the Swift Testing module and SwiftData macro plugins. The signed Mac app and on-device permissions still require Mohit’s Xcode/device check. A standalone core smoke harness was run before the toolchain mismatch appeared; native dashboard launch was attempted but failed in AppKit/LaunchServices before UI inspection.
+- `scripts/test-core.sh`: 33 fixtures pass; XCTest itself is absent in the installed
+  Command Line Tools, so the same fixture bodies run through the portable adapter.
+- UI/app/collector Swift 6 type checking passes against a temporary store stub.
+  This does not verify production persistence.
+- A temporary native preview with explicitly labeled sample data launched and was
+  visually reviewed. No sample data is included in the shipping target.
+- UI automation's scroll call returned `noWindowsAvailable`; filtered selection was
+  confirmed through the updated accessibility tree, but scrolling is still unchecked.
+- `scripts/build-mac-app.sh`: stops clearly because full Xcode is absent. Earlier
+  compile attempts confirm the missing `SwiftDataMacros` compiler plugin.
+- Both shell scripts pass `bash -n`; core and UI checks are independent of paid services.
+
+## Resume here
+
+Select a full Xcode installation, run the two scripts in README.md, then perform the
+acceptance checks above. Do not count the sample-data preview as a verified live tracker.

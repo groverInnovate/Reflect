@@ -207,3 +207,23 @@ The SwiftData conversion aliases are module-visible in the Mac target rather tha
 ## 2026-08-15 - Make accuracy the first mentor action
 
 When at least 30 minutes is unobserved, the journal’s next action tells the user to fix collection or permissions before changing their behavior. The alternative was motivational advice based on an incomplete day, which violates the mentor promise and can train the user to distrust the score.
+
+## 2026-10-05 — Mac workday analysis supersedes the original product
+
+Removed companion/health scope, AI narratives, coaching, score UI, reminders, and intervention notifications.
+Mohit's updated purpose is actionable workday time data; retained only daily accounting, editable categories, timeline, hourly breakdown, history by date, and CSV.
+
+## 2026-10-05 — Unknown intervals stay unknown
+
+Pause/quit have explicit stop boundaries; delayed timers no longer infer sleep, and only contiguous intervals merge. The Mac report bounds stale attribution to 30 seconds.
+This favors small, visible missing intervals over invented app time; all new report aggregation keeps seconds until display formatting.
+
+## 2026-10-05 — Preserve stores while removing product features
+
+Retained the previous SwiftData entity names, including the unused health entity, solely for schema compatibility; no health code exists in Core or collection/UI.
+Deleting legacy tables during the cleanup could risk users' activity stores; real existing-store migration verification remains pending full Xcode.
+
+## 2026-10-05 — Independent core verification and honest production status
+
+Moved fixtures to XCTest and added a standalone Core manifest plus a portable adapter that runs the same fixtures when Command Line Tools lacks XCTest.
+33 tests pass and the native sample-data UI was visually inspected; production SwiftData compilation is blocked by missing full Xcode, so live-device acceptance remains open.
