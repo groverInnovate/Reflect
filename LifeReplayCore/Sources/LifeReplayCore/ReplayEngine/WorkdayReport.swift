@@ -29,7 +29,15 @@ public struct WorkdayReport: Sendable {
     public var idleSeconds: TimeInterval
     public var unobservedSeconds: TimeInterval
 
-    public init(blocks: [TimelineBlock], calendar: Calendar = .current) {
+    public init(blocks input: [TimelineBlock], interval: DateInterval? = nil, calendar: Calendar = .current) {
+        let blocks = input.compactMap { block -> TimelineBlock? in
+            var clipped = block
+            if let interval {
+                clipped.start = max(interval.start, block.start)
+                clipped.end = min(interval.end, block.end)
+            }
+            return clipped.end > clipped.start ? clipped : nil
+        }
         var compacted: [TimelineBlock] = []
         for block in blocks.sorted(by: { $0.start < $1.start }) where block.end > block.start {
             if let last = compacted.last, last.kind == block.kind,

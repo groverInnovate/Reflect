@@ -31,7 +31,7 @@ public enum DefaultAppCategories {
         .init("developer.apple.com", "Apple Developer Docs", .productive),
         .init("docs.rs", "Rust Docs", .productive),
         .init("rust-book.cs.brown.edu", "Rust Book", .productive),
-        .init("doc.rust-lang.org/book", "Rust Book", .productive),
+        .init("doc.rust-lang.org", "Rust Docs", .productive),
         .init("stackoverflow.com", "Stack Overflow", .productive),
         .init("arxiv.org", "Research Papers", .productive),
         .init("overleaf.com", "Overleaf", .productive),
@@ -108,8 +108,11 @@ public struct CategoryResolver: Sendable {
             // The collector stores hosts, never URL paths. Match domain boundaries,
             // so x.com does not match unrelated sites ending in those letters.
             if let match = ranked.first(where: {
-                let pattern = $0.matchPattern.lowercased()
-                return !pattern.contains("/") && (domain == pattern || domain.hasSuffix("." + pattern))
+                // Older stores included URL-path rules even though capture only
+                // records hosts. Keep those rules usable at host precision.
+                let raw = $0.matchPattern.lowercased().split(separator: "/").first.map(String.init) ?? ""
+                let pattern = raw.hasPrefix("www.") ? String(raw.dropFirst(4)) : raw
+                return !pattern.isEmpty && (domain == pattern || domain.hasSuffix("." + pattern))
             }) { return match }
             // A known domain is stronger evidence than ambiguous title words.
             return nil

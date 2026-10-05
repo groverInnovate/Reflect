@@ -83,4 +83,45 @@ final class WorkdayReportTests: XCTestCase {
         let subdomain = ActivityEvent(timestamp: start, kind: .browserDomain, browserDomain: "m.youtube.com")
         XCTAssertTrue(resolver.displayName(for: subdomain) == "YouTube")
     }
+    func testMidnightCarryKeepsOriginalObservationExpiry() {
+        let blocks = ActivityTimelineEngine(configuration: .init(maximumObservedGap: 30)).blocks(
+            from: [event(-20, .heartbeat, "Editor")], resolver: CategoryResolver(), now: start.addingTimeInterval(40))
+        let report = WorkdayReport(blocks: blocks, interval: DateInterval(start: start, end: start.addingTimeInterval(40)))
+        XCTAssertTrue(report.activeSeconds == 10)
+        XCTAssertTrue(report.unobservedSeconds == 30)
+        XCTAssertTrue(report.blocks.allSatisfy { $0.start >= start })
+    }
+    func testOvernightIdleIsClippedToSelectedDay() {
+        let blocks = ActivityTimelineEngine().blocks(from: [event(-3600, .idleStart), event(60, .idleEnd)],
+            resolver: CategoryResolver(), now: start.addingTimeInterval(120))
+        let report = WorkdayReport(blocks: blocks, interval: DateInterval(start: start, end: start.addingTimeInterval(120)))
+        XCTAssertTrue(report.idleSeconds == 60)
+        XCTAssertTrue(report.unobservedSeconds == 60)
+        XCTAssertTrue(report.activeSeconds == 0)
+    }
+    func testEmptyHoursRemainVisibleBetweenWorkSessions() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let report = WorkdayReport(blocks: [
+            TimelineBlock(start: start, end: start.addingTimeInterval(30), label: "Editor", category: .productive),
+            TimelineBlock(start: start.addingTimeInterval(7200), end: start.addingTimeInterval(7230), label: "Editor", category: .productive)
+        ], calendar: calendar)
+        XCTAssertTrue(report.hours.count == 3)
+        XCTAssertTrue(report.hours[1].active == 0)
+    }
+    func testEmptyDayHasNoInventedActivity() {
+        let report = WorkdayReport(blocks: [])
+        XCTAssertTrue(report.activeSeconds == 0 && report.idleSeconds == 0 && report.unobservedSeconds == 0)
+        XCTAssertTrue(report.blocks.isEmpty && report.hours.isEmpty && report.activities.isEmpty)
+    }
+    func testHourlyAccountingConservesSecondsAcrossDaylightSaving() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        let beginning = Date(timeIntervalSince1970: 1730611800)
+        let report = WorkdayReport(blocks: [TimelineBlock(start: beginning, end: beginning.addingTimeInterval(7200),
+            label: "Editor", category: .productive)], calendar: calendar)
+        XCTAssertTrue(report.activeSeconds == 7200)
+        XCTAssertTrue(report.hours.reduce(0) { $0 + $1.active } == 7200)
+        XCTAssertTrue(Set(report.hours.map(\.id)).count == report.hours.count)
+    }
 }

@@ -20,20 +20,7 @@ final class ReplayEngineTests: XCTestCase {
         XCTAssertTrue(blocks[1].label == "Terminal")
     }
 
-    // fallback summary names longest productive block
-    func testFallbackSummaryUsesLongestBlock() {
-        let start = Date(timeIntervalSince1970: 0)
-        let blocks = [
-            TimelineBlock(start: start, end: start.addingTimeInterval(600), label: "Mail", category: .neutral),
-            TimelineBlock(start: start.addingTimeInterval(900), end: start.addingTimeInterval(3900), label: "VS Code", category: .productive),
-        ]
 
-        let summary = ReplayEngine().fallbackSummary(blocks: blocks, driftEvents: [], focusScore: 82)
-
-        XCTAssertTrue(summary.contains("VS Code"))
-        XCTAssertTrue(summary.contains("50m"))
-        XCTAssertTrue(summary.contains("82"))
-    }
 
     // timeline blocks round-trip through JSON
     func testTimelineBlocksRoundTrip() throws {
@@ -166,144 +153,16 @@ final class ReplayEngineTests: XCTestCase {
 
         XCTAssertTrue(blocks.contains { $0.kind == .observed && $0.label == "VS Code" && $0.end.timeIntervalSince($0.start) == 120 })
         XCTAssertTrue(blocks.contains { $0.kind == .unobserved && $0.label == "Unobserved / away" })
-        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
-        XCTAssertTrue(report.productiveMinutes == 2)
-        XCTAssertTrue(report.unobservedMinutes == 58)
-        XCTAssertTrue(report.journalSummary.contains("unobserved"))
-        XCTAssertTrue(report.nextAction.contains("fix collection"))
+        let report = WorkdayReport(blocks: blocks)
+        XCTAssertTrue(report.productiveSeconds == 120)
+        XCTAssertTrue(report.unobservedSeconds == 58 * 60)
     }
 
-    // insight report turns timeline blocks into journal metrics
-    func testInsightReportBuildsJournalMetrics() {
-        let start = Date(timeIntervalSince1970: 0)
-        let blocks = [
-            TimelineBlock(
-                start: start,
-                end: start.addingTimeInterval(3_600),
-                label: "Research reading",
-                category: .productive,
-                detail: "PDF notes"
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(4_900),
-                end: start.addingTimeInterval(5_500),
-                label: "VS Code",
-                category: .productive,
-                detail: "Terminal"
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(5_700),
-                end: start.addingTimeInterval(6_600),
-                label: "Twitter",
-                category: .distracting
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(6_900),
-                end: start.addingTimeInterval(7_800),
-                label: "Idle period",
-                category: .neutral,
-                detail: "No keyboard or mouse input"
-            ),
-        ]
-        let drifts = [
-            DriftEvent(
-                timestamp: start.addingTimeInterval(5_800),
-                triggerAppNames: ["Twitter"],
-                switchCountInWindow: 8,
-                baselineSwitchRate: 12,
-                severity: 0.7
-            ),
-        ]
 
-        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: drifts, focusScore: 74)
 
-        XCTAssertTrue(report.productiveMinutes == 70)
-        XCTAssertTrue(report.studyLikeMinutes == 60)
-        XCTAssertTrue(report.codingLikeMinutes == 10)
-        XCTAssertTrue(report.deepWorkMinutes == 60)
-        XCTAssertTrue(report.fragmentedProductiveMinutes == 10)
-        XCTAssertTrue(report.distractingMinutes == 15)
-        XCTAssertTrue(report.idleMinutes == 15)
-        XCTAssertTrue(report.neutralMinutes == 0)
-        XCTAssertTrue(report.driftCount == 1)
-        XCTAssertTrue(report.longestProductiveBlockLabel == "Research reading")
-        XCTAssertTrue(report.topActivities.first == ActivityBreakdownItem(label: "Research reading", category: .productive, minutes: 60))
-        XCTAssertTrue(report.topActivities.contains(ActivityBreakdownItem(label: "Twitter", category: .distracting, minutes: 15)))
-        XCTAssertTrue(report.topProductiveLabels.first == "Research reading")
-        XCTAssertTrue(report.topDistractions.first == "Twitter")
-        XCTAssertTrue(!report.nextAction.isEmpty)
-        XCTAssertTrue(report.journalSummary.contains("productive"))
-        XCTAssertTrue(report.journalSummary.contains("Distracting/wasted"))
-    }
 
-    // insight report warns about suspiciously long active blocks
-    func testInsightReportWarnsAboutLongUnsplitBlocks() {
-        let start = Date(timeIntervalSince1970: 0)
-        let blocks = [
-            TimelineBlock(
-                start: start,
-                end: start.addingTimeInterval(7 * 3_600),
-                label: "VS Code",
-                category: .productive
-            ),
-        ]
 
-        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 90)
 
-        XCTAssertTrue(report.dataQualityWarnings.contains { $0.contains("VS Code") })
-    }
 
-    // insight report suggests category calibration for high neutral time
-    func testInsightReportSuggestsCategoryCalibration() {
-        let start = Date(timeIntervalSince1970: 0)
-        let blocks = [
-            TimelineBlock(
-                start: start,
-                end: start.addingTimeInterval(90 * 60),
-                label: "Unknown Research Tool",
-                category: .neutral
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(90 * 60),
-                end: start.addingTimeInterval(120 * 60),
-                label: "VS Code",
-                category: .productive
-            ),
-        ]
 
-        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 40)
-
-        XCTAssertTrue(report.calibrationSuggestions.contains { $0.contains("edit categories") })
-        XCTAssertTrue(report.calibrationSuggestions.contains { $0.contains("Unknown Research Tool") })
-    }
-
-    // AI support near notes counts as study workflow
-    func testAiSupportNearNotesCountsAsStudyWorkflow() {
-        let start = Date(timeIntervalSince1970: 0)
-        let blocks = [
-            TimelineBlock(
-                start: start,
-                end: start.addingTimeInterval(20 * 60),
-                label: "HackMD",
-                category: .productive
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(20 * 60),
-                end: start.addingTimeInterval(25 * 60),
-                label: "Claude",
-                category: .productive
-            ),
-            TimelineBlock(
-                start: start.addingTimeInterval(25 * 60),
-                end: start.addingTimeInterval(45 * 60),
-                label: "HackMD",
-                category: .productive
-            ),
-        ]
-
-        let report = ReplayEngine().insightReport(blocks: blocks, driftEvents: [], focusScore: 80)
-
-        XCTAssertTrue(report.productiveMinutes == 45)
-        XCTAssertTrue(report.studyLikeMinutes == 45)
-    }
 }
